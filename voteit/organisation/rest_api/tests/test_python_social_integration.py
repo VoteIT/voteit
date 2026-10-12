@@ -68,7 +68,7 @@ class SocialIntegrationTests(APITestCase):
         provider.save()
 
     def test_begin_login(self):
-        response = self.client.get("/login/idproxy/")
+        response = self.client.post("/login/idproxy/")
         location = response.get("Location")
         self.assertTrue(location)
         self.assertIn("client_id=id-key", location)
@@ -83,7 +83,7 @@ class SocialIntegrationTests(APITestCase):
 
     @responses.activate
     def test_complete_new_user(self):
-        response = self.client.get("/login/idproxy/")
+        response = self.client.post("/login/idproxy/")
         location = response.get("Location")
         parsed = parse_qs(location)
         state = parsed["state"][0]
@@ -124,7 +124,8 @@ class SocialIntegrationTests(APITestCase):
     def test_complete_new_user_must_accept_tos(self):
         gtos = GlobalTermsOfService.objects.create(required_from=now().date())
         users = User.objects.count()
-        state = parse_qs(self.client.get("/login/idproxy/").get("Location"))["state"][0]
+        location = self.client.post("/login/idproxy/").get("Location")
+        state = parse_qs(location)["state"][0]
         responses.add(
             responses.POST,
             "https://idproxy/o/token/",
@@ -158,7 +159,7 @@ class SocialIntegrationTests(APITestCase):
     def test_complete_existing_user(self):
         user = User.objects.create(username="adminer", email="admin@betahaus.net")
         usa = user.social_auth.create(uid="123", provider="idproxy")
-        response = self.client.get("/login/idproxy/")
+        response = self.client.post("/login/idproxy/")
         location = response.get("Location")
         parsed = parse_qs(location)
         state = parsed["state"][0]
@@ -197,7 +198,7 @@ class SocialIntegrationTests(APITestCase):
             username="adminer", email="admin@betahaus.net"
         )
         user.social_auth.create(uid="123", provider="idproxy")
-        response = self.client.get("/login/idproxy/")
+        response = self.client.post("/login/idproxy/")
         location = response.get("Location")
         parsed = parse_qs(location)
         state = parsed["state"][0]
@@ -239,7 +240,7 @@ class SocialIntegrationTests(APITestCase):
         user = self.organisation.users.create(
             username="adminer", email="admin@betahaus.net", identity_id="123"
         )
-        response = self.client.get("/login/idproxy/")
+        response = self.client.post("/login/idproxy/")
         location = response.get("Location")
         parsed = parse_qs(location)
         state = parsed["state"][0]
@@ -272,7 +273,9 @@ class SocialIntegrationTests(APITestCase):
 
     @responses.activate
     def test_redirect_to_initial_page(self):
-        response = self.client.get("/login/idproxy/?next=http://testing/somepage")
+        response = self.client.post(
+            "/login/idproxy/", {"next": "http://testing/somepage"}, format="multipart"
+        )
         location = response.get("Location")
         parsed = parse_qs(location)
         state = parsed["state"][0]
@@ -300,7 +303,7 @@ class SocialIntegrationTests(APITestCase):
         self.organisation.save()
         user = User.objects.create(username="adminer", email="admin@betahaus.net")
         user.social_auth.create(uid="123", provider="idproxy")
-        response = self.client.get("/login/idproxy/")
+        response = self.client.post("/login/idproxy/")
         location = response.get("Location")
         parsed = parse_qs(location)
         state = parsed["state"][0]
@@ -326,7 +329,7 @@ class SocialIntegrationTests(APITestCase):
     def test_bump_permission(self):
         user = User.objects.create(username="adminer", email="admin@betahaus.net")
         user.social_auth.create(uid="123", provider="idproxy")
-        response = self.client.get("/login/idproxy/")
+        response = self.client.post("/login/idproxy/")
         location = response.get("Location")
         parsed = parse_qs(location)
         state = parsed["state"][0]
@@ -367,7 +370,7 @@ class SocialIntegrationTests(APITestCase):
             identity_id="123",
             last_login=now() - timedelta(days=100),
         )
-        response = self.client.get("/login/idproxy/")
+        response = self.client.post("/login/idproxy/")
         location = response.get("Location")
         parsed = parse_qs(location)
         state = parsed["state"][0]
@@ -398,7 +401,7 @@ class SocialIntegrationTests(APITestCase):
             email="forgotten@betahaus.net",
             identity_id="123",
         )
-        response = self.client.get("/login/idproxy/")
+        response = self.client.post("/login/idproxy/")
         location = response.get("Location")
         parsed = parse_qs(location)
         state = parsed["state"][0]
@@ -432,7 +435,7 @@ class SocialIntegrationTests(APITestCase):
             username="old_user", email="forgotten@betahaus.net", identity_id="def"
         )
         user.social_auth.create(uid="123", provider="idproxy")
-        response = self.client.get("/login/idproxy/")
+        response = self.client.post("/login/idproxy/")
         location = response.get("Location")
         parsed = parse_qs(location)
         state = parsed["state"][0]
@@ -464,7 +467,7 @@ class SocialIntegrationTests(APITestCase):
     def test_email_updated_when_not_in_extra_data(self):
         user = User.objects.create(username="adminer", email="wrong@betahaus.net")
         user.social_auth.create(uid="123", provider="idproxy")
-        response = self.client.get("/login/idproxy/")
+        response = self.client.post("/login/idproxy/")
         location = response.get("Location")
         parsed = parse_qs(location)
         state = parsed["state"][0]
@@ -491,7 +494,7 @@ class SocialIntegrationTests(APITestCase):
     def test_email_cleared_when_no_emails_in_extra_data(self):
         user = User.objects.create(username="adminer", email="admin@betahaus.net")
         user.social_auth.create(uid="123", provider="idproxy")
-        response = self.client.get("/login/idproxy/")
+        response = self.client.post("/login/idproxy/")
         location = response.get("Location")
         parsed = parse_qs(location)
         state = parsed["state"][0]
@@ -525,7 +528,7 @@ class SocialIntegrationTests(APITestCase):
             username="auth", email="admin@betahaus.net", identity_id="123"
         )
         self.client.force_login(authenticated_user)
-        response = self.client.get("/login/idproxy/")
+        response = self.client.post("/login/idproxy/")
         location = response.get("Location")
         parsed = parse_qs(location)
         state = parsed["state"][0]

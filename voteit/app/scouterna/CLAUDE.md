@@ -27,7 +27,7 @@ credentials from that organisation's `OAuth2Provider` row with
 - `get_user_id()` returns the Scoutnet membership number (the `scoutnet_member_no`
   claim, see `get_member_no()`), stored as `UserSocialAuth.uid` — users are matched on it, not
   on the Keycloak `sub`. A login without a member number fails with
-  `AuthMissingParameter`. The uid never reaches `User.identity_id`: that column holds an
+  `AuthResponseError` (`missing_claim`). The uid never reaches `User.identity_id`: that column holds an
   id proxy identifier and nothing else, so a ScoutID-only account has no `identity_id`
   at all and is reached through its credential. See `voteit/organisation/CLAUDE.md`.
 

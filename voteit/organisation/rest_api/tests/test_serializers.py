@@ -36,7 +36,7 @@ class OrganisationSerializerTests(TestCase):
                 {
                     "provider_id": IDPROXY_PROVIDER,
                     "title": "VoteIT ID",
-                    "login_url": "https://idproxy/login-to/testserver",
+                    "login_url": "/login/idproxy/",
                     "profile_url": "https://idproxy/",
                     "logout_url": "https://idproxy/log-out",
                     "scope": ["email"],
@@ -85,7 +85,7 @@ class OrganisationSerializerTests(TestCase):
                 {
                     "provider_id": IDPROXY_PROVIDER,
                     "title": "VoteIT ID",
-                    "login_url": "https://idproxy/login-to/testserver",
+                    "login_url": "/login/idproxy/",
                     "profile_url": "https://idproxy/",
                     "logout_url": "https://idproxy/log-out",
                     "scope": ["email"],

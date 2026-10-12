@@ -521,6 +521,7 @@ class MatchExistingUserTests(TestCase):
 
     def _run(self, backend=None, details=None, answer=None, **kwargs):
         self.strategy = MagicMock()
+        self.strategy.get_storage.return_value = self.strategy.storage
         self.strategy.storage.partial.prepare.return_value.token = "a-token"
         self.strategy.request_data.return_value = (
             {LINK_ACCOUNT_FIELD: answer} if answer else {}
@@ -693,6 +694,7 @@ class RequireTosAcceptTests(TestCase):
 
     def _run(self, user=None, answer=None):
         self.strategy = MagicMock()
+        self.strategy.get_storage.return_value = self.strategy.storage
         self.strategy.storage.partial.prepare.return_value.token = "a-token"
         self.strategy.request_data.return_value = (
             {ACCEPT_TOS_FIELD: answer} if answer else {}

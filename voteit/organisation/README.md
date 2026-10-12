@@ -235,7 +235,7 @@ waiting to happen, so they are sent back to the login they already have.
     ... )
     >>> signing_in("Kai", "Scout", "manager@example.com")
     Traceback (most recent call last):
-    social_core.exceptions.AuthException: You already have an account here that
+    voteit.organisation.pipeline.LoginRefused: You already have an account here that
     manages the organisation. Sign in with VoteIT ID instead, then connect
     ScoutID from your profile.
 
@@ -243,8 +243,8 @@ It names the login methods the account actually has, because "sign in the way yo
 usually do" is no help to somebody who has just been told no. The message reaches
 the SPA through `GET /api/user/messages/`, by way of
 `SocialAuthExceptionMiddleware` -- which renders `str(exception)`, so the
-exception has to be one that keeps its message. `AuthForbidden` does not: its
-`__str__` returns "Your credentials aren't allowed" whatever it was given. An org manager on the same address under another
+exception has to be one that keeps its message. social_core's own do not: they
+stringify to a generic reason whatever they were given, hence `LoginRefused`. An org manager on the same address under another
 name is somebody else, and neither blocks nor is offered.
 
     >>> outcome(signing_in("Ida", "Scout", "manager@example.com"))
@@ -353,7 +353,7 @@ old account they forgot, and a new one made by another provider.
     ...     {CONNECT_INTENT_SESSION_KEY: "scoutid"}, uid="an-old-sub", user=existing
     ... )
     Traceback (most recent call last):
-    social_core.exceptions.AuthException: This ScoutID login already belongs to
+    voteit.organisation.pipeline.LoginRefused: This ScoutID login already belongs to
     another account here. Sign in with ScoutID to use that account. To connect it
     to this account instead, first remove ScoutID from the other account.
 

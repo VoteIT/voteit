@@ -19,7 +19,7 @@ from django.urls import reverse
 from django.utils.timezone import now
 from rest_framework.test import APITestCase
 from social_core.exceptions import AuthException
-from social_core.exceptions import AuthMissingParameter
+from social_core.exceptions import AuthResponseError
 from social_django.models import UserSocialAuth
 from social_django.storage import BaseDjangoStorage
 from social_django.strategy import DjangoStrategy
@@ -34,6 +34,8 @@ from voteit.organisation.utils import get_user_member_ids
 from voteit.organisation.pipeline import CONNECT_INTENT_SESSION_KEY
 from voteit.organisation.roles import ROLE_ORG_MANAGER
 from voteit.organisation.models import Organisation
+from voteit.organisation.models import GlobalTermsOfService
+from voteit.organisation.models import UserAccept
 
 User = get_user_model()
 
@@ -272,7 +274,7 @@ class ScoutIDBackendTests(TestCase):
         )
 
     def test_user_id_without_a_member_no_is_an_auth_error(self):
-        with self.assertRaises(AuthMissingParameter):
+        with self.assertRaises(AuthResponseError):
             self._backend().get_user_id(
                 {}, {"sub": "uuid", "preferred_username": "scoutnet|9876543"}
             )
@@ -425,7 +427,7 @@ class ScoutIDLoginTests(APITestCase):
             f"{ISSUER}/.well-known/openid-configuration",
             json=self.realm.config,
         )
-        response = self.client.get("/login/scoutid/")
+        response = self.client.post("/login/scoutid/")
         self.assertEqual(302, response.status_code)
         location = response.get("Location")
         self.assertTrue(
@@ -442,7 +444,7 @@ class ScoutIDLoginTests(APITestCase):
             f"{ISSUER}/.well-known/openid-configuration",
             json=self.realm.config,
         )
-        response = self.client.get("/login/scoutid/")
+        response = self.client.post("/login/scoutid/")
         params = parse_qs(urlparse(response.get("Location")).query)
         self.assertEqual(["voteit"], params["client_id"])
         self.assertEqual(["code"], params["response_type"])
@@ -456,7 +458,7 @@ class ScoutIDLoginTests(APITestCase):
             f"{ISSUER}/.well-known/openid-configuration",
             json=self.realm.config,
         )
-        response = self.client.get("/login/scoutid/")
+        response = self.client.post("/login/scoutid/")
         params = parse_qs(urlparse(response.get("Location")).query)
         self.assertEqual(["S256"], params["code_challenge_method"])
         self.assertTrue(params["code_challenge"][0])
@@ -545,7 +547,7 @@ class ScoutIDLoginTests(APITestCase):
             self.realm.id_token("voteit", nonce, scoutnet_member_no=None),
             userinfo={"sub": "b4d3e2f1-0000-4000-8000-000000000001"},
         )
-        with self.assertRaises(AuthMissingParameter):
+        with self.assertRaises(AuthResponseError):
             self.client.get("/complete/scoutid/", data={"state": state, "code": "code"})
         self.assertFalse(
             UserSocialAuth.objects.filter(provider=SCOUTID_PROVIDER).exists()
@@ -845,6 +847,55 @@ class ScoutIDLoginTests(APITestCase):
         self.assertEqual(created, auth.get_user(self.client))
 
     @responses.activate
+    def test_a_resumed_login_can_pause_again(self):
+        """
+        Answering the account question runs into the terms of service, so the
+        validated id token has to survive two partials, not one.
+        """
+        gtos = GlobalTermsOfService.objects.create(required_from=now().date())
+        stale, token = self._pause_on(
+            username="kim",
+            first_name="Kim",
+            last_name="Scout",
+            email="kim@scoutkaren.example",
+        )
+        response = self.client.get(
+            "/complete/scoutid/",
+            data={"partial_token": token, "link_account": str(stale.pk)},
+        )
+        location = response.get("Location")
+        self.assertTrue(location.startswith(settings.ACCEPT_TOS_URL), location)
+        tos_token = parse_qs(urlparse(location).query)["partial_token"][0]
+        self.assertNotEqual(token, tos_token)
+        response = self.client.get(
+            "/complete/scoutid/",
+            data={"partial_token": tos_token, "accept_tos": gtos.version.isoformat()},
+        )
+        self.assertEqual(settings.LOGIN_REDIRECT_URL, response.get("Location"))
+        self.assertEqual(stale, auth.get_user(self.client))
+        self.assertEqual(stale, User.objects.get(social_auth__uid="9876543"))
+        self.assertTrue(UserAccept.objects.filter(user=stale).exists())
+
+    @responses.activate
+    def test_a_partial_only_resumes_in_the_session_that_paused(self):
+        stale, token = self._pause_on(
+            username="kim",
+            first_name="Kim",
+            last_name="Scout",
+            email="kim@scoutkaren.example",
+        )
+        self.client.cookies.clear()
+        response = self.client.get(
+            "/complete/scoutid/",
+            data={"partial_token": token, "link_account": str(stale.pk)},
+        )
+        self.assertEqual(settings.LOGIN_ERROR_URL, response.get("Location"))
+        self.assertFalse(auth.get_user(self.client).is_authenticated)
+        self.assertFalse(
+            UserSocialAuth.objects.filter(provider=SCOUTID_PROVIDER).exists()
+        )
+
+    @responses.activate
     def test_a_managers_account_blocks_the_login(self):
         """
         No second account to merge away later: they are told to sign in the way
@@ -949,26 +1000,26 @@ class ScoutIDLoginTests(APITestCase):
 
     @responses.activate
     def test_complete_rejects_wrong_issuer(self):
-        from social_core.exceptions import AuthTokenError
+        from social_core.exceptions import AuthResponseError
 
         state, nonce = self._begin()
         self.realm.register(
             self.realm.id_token("voteit", nonce, iss=OTHER_ISSUER),
             userinfo={"sub": "b4d3e2f1-0000-4000-8000-000000000001"},
         )
-        with self.assertRaises(AuthTokenError):
+        with self.assertRaises(AuthResponseError):
             self.client.get("/complete/scoutid/", data={"state": state, "code": "code"})
 
     @responses.activate
     def test_complete_rejects_wrong_nonce(self):
-        from social_core.exceptions import AuthTokenError
+        from social_core.exceptions import AuthResponseError
 
         state, _nonce = self._begin()
         self.realm.register(
             self.realm.id_token("voteit", "not-the-nonce"),
             userinfo={"sub": "b4d3e2f1-0000-4000-8000-000000000001"},
         )
-        with self.assertRaises(AuthTokenError):
+        with self.assertRaises(AuthResponseError):
             self.client.get("/complete/scoutid/", data={"state": state, "code": "code"})
 
     @responses.activate

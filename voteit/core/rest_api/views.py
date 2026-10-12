@@ -15,7 +15,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from social_core.actions import do_disconnect
-from social_core.exceptions import NotAllowedToDisconnect
+from social_core.exceptions import AuthPolicyError
 from social_django.utils import load_backend
 from social_django.utils import load_strategy
 from statemachine import registry as sm_registry
@@ -238,7 +238,9 @@ class UserView(
         backend = load_backend(strategy, provider.provider_id, redirect_uri=None)
         try:
             do_disconnect(backend, request.user)
-        except NotAllowedToDisconnect:
+        except AuthPolicyError as exc:
+            if exc.code != "disconnect_disallowed":
+                raise
             # SOCIAL_AUTH_DISCONNECT_PIPELINE drops the step that raises this,
             # deliberately -- see the note there. Still answered properly in case
             # a deployment puts it back.

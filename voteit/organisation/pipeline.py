@@ -6,7 +6,7 @@ from django.conf import settings
 from django.contrib.auth import login
 from django.utils.dateparse import parse_datetime
 from django.utils.timezone import is_aware
-from social_core.exceptions import AuthException
+from social_core.exceptions import AuthPolicyError
 from social_core.pipeline.partial import partial
 from django.utils.translation import gettext as _
 from social_django.models import UserSocialAuth
@@ -29,9 +29,21 @@ User = get_user_model()
 CONNECT_INTENT_SESSION_KEY = "voteit_connect_intent"
 
 
+class LoginRefused(AuthPolicyError):
+    """
+    A refusal whose message is meant for the person logging in.
+
+    social_core's own exceptions show a generic reason and keep what they were
+    given in ``detail``. ``SocialAuthExceptionMiddleware`` renders ``str()``.
+    """
+
+    def __str__(self):
+        return self.detail or super().__str__()
+
+
 def org_active(strategy, details, backend, user=None, *args, **kwargs):
     if not backend.organisation.active:
-        raise AuthException(backend, _("This organisation is no longer active."))
+        raise LoginRefused(backend, _("This organisation is no longer active."))
 
 
 def _reauth_user(backend, user):
@@ -173,7 +185,7 @@ def require_connect_intent(backend, uid, user=None, *args, **kwargs):
                 backend.name,
                 user.pk,
             )
-            raise AuthException(backend, _connected_elsewhere_message(backend))
+            raise LoginRefused(backend, _connected_elsewhere_message(backend))
         return
     if social:
         # A credential we already know. Whose it is, is social_user's call.
@@ -303,7 +315,7 @@ def match_existing_user(
         # This login answers to a manager's account. Letting it through would
         # make a second account that someone has to merge in later; refusing it
         # keeps them on the one path that proves both logins are theirs.
-        raise AuthException(backend, _elevated_message(backend, elevated[0]))
+        raise LoginRefused(backend, _elevated_message(backend, elevated[0]))
     # An elevated account on the same address under another name is somebody
     # else's, and never on offer.
     choices = [candidate for candidate in candidates if not is_elevated(candidate)]

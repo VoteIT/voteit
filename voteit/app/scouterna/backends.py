@@ -4,7 +4,7 @@ from typing import Any
 
 from django.conf import settings
 from social_core.backends.open_id_connect import OpenIdConnectAuth
-from social_core.exceptions import AuthMissingParameter
+from social_core.exceptions import AuthResponseError
 from social_core.utils import cache
 
 from voteit.app.scouterna import SCOUTID_PROVIDER
@@ -107,6 +107,15 @@ class ScoutIDOpenIdConnect(OrganisationBackendMixin, OpenIdConnectAuth):
     # find_valid_key() calls this on an unknown kid, to pick up a rotated key.
     get_jwks_keys.invalidate = _jwks_keys_for.invalidate  # type: ignore[attr-defined]
 
+    def pipeline(self, pipeline, pipeline_index: int = 0, *args, **kwargs):
+        # django.contrib.auth.authenticate() runs this on a fresh instance, but
+        # the validated id_token is on kwargs["backend"]. Without it social_core
+        # (6.1.1) never stores the claims in a partial, and resuming one fails.
+        backend = kwargs.get("backend")
+        if backend is not None and backend is not self:
+            self.id_token = backend.id_token
+        return super().pipeline(pipeline, pipeline_index, *args, **kwargs)
+
     def _claim(self, response: dict[str, Any], key: str) -> Any:
         """
         A claim may come from userinfo or only from the id token, depending on
@@ -138,7 +147,9 @@ class ScoutIDOpenIdConnect(OrganisationBackendMixin, OpenIdConnectAuth):
         """
         if member_no := self.get_member_no(response):
             return member_no
-        raise AuthMissingParameter(self, SCOUTNET_MEMBER_NO)
+        raise AuthResponseError(
+            self, code="missing_claim", claim=SCOUTNET_MEMBER_NO, stage="user_info"
+        )
 
     def extra_data(
         self,
