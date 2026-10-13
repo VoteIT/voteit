@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.4 (unreleased)
+
+Login flow, upgraded to social-auth-core 6 / social-auth-app-django 7.
+
+- **Cross-origin login posts**: `/login/<backend>/` accepts POSTs without a CSRF
+  token from origins the provider trusts - `get_login_origins()`.
+- **Standard login flow via IDProxy**: The /o/authorize/ page handles any quirks instead, so login can be initiated normally.
+
 ## v1.3 (2026-10-09)
 
 Organisation-specific layout

@@ -44,6 +44,8 @@ class ScoutIDOpenIdConnect(OrganisationBackendMixin, OpenIdConnectAuth):
     'S256'
     >>> backend.MEMBER_ID_KEY
     'scoutnet_member_no'
+    >>> backend.id_key()
+    'scoutnet_member_no'
     """
 
     name = SCOUTID_PROVIDER
@@ -53,6 +55,8 @@ class ScoutIDOpenIdConnect(OrganisationBackendMixin, OpenIdConnectAuth):
     # OpenIdConnectAuth turns off the PKCE its own base class enables.
     DEFAULT_USE_PKCE = True
     MEMBER_ID_KEY = SCOUTNET_MEMBER_NO
+    # Stored as UserSocialAuth.id_key, see get_user_id
+    ID_KEY = SCOUTNET_MEMBER_NO
     EXTRA_DATA = [
         ("sub", "id"),
     ]

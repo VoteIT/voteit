@@ -69,6 +69,12 @@ SITE_ID = 1
 SOCIAL_AUTH_JSONFIELD_ENABLED = True
 SOCIAL_AUTH_FIELDS_STORED_IN_SESSION = ["next"]
 SOCIAL_AUTH_USERNAME_IS_FULL_EMAIL = False
+#: social_django's 0020_backfill_id_keys only knows the built-in backends.
+#: Must match each backend's ID_KEY, or old associations stop resolving.
+SOCIAL_AUTH_OLD_ID_KEYS = {
+    "idproxy": "identity_id",
+    "scoutid": "scoutnet_member_no",
+}
 # Load all SOCIAL_AUTH__
 for env_k, env_v in os.environ.items():
     if env_k.startswith("SOCIAL_AUTH_"):

@@ -70,7 +70,7 @@ def _transfer_social_auths(from_user, to_user, provider: str | None = None):
     qs.update(user=to_user)
 
 
-def social_user(backend, uid, user=None, *args, **kwargs):
+def social_user(backend, uid, user=None, *args, id_key="", **kwargs):
     """
     Custom version that authenticates a different user in case one is already logged in.
 
@@ -85,7 +85,7 @@ def social_user(backend, uid, user=None, *args, **kwargs):
     account matcher's job, not this step's.
     """
     provider = backend.name
-    social = backend.strategy.storage.user.get_social_auth(provider, uid)
+    social = backend.strategy.storage.user.get_social_auth(provider, uid, id_key=id_key)
     if provider != IDPROXY_PROVIDER:
         if social:
             if user and social.user != user:
@@ -153,7 +153,7 @@ def social_user(backend, uid, user=None, *args, **kwargs):
     }
 
 
-def require_connect_intent(backend, uid, user=None, *args, **kwargs):
+def require_connect_intent(backend, uid, user=None, *args, id_key="", **kwargs):
     """
     A signed-in account only picks up a new login method on purpose.
 
@@ -177,7 +177,9 @@ def require_connect_intent(backend, uid, user=None, *args, **kwargs):
     intent = backend.strategy.session_pop(CONNECT_INTENT_SESSION_KEY)
     if user is None:
         return
-    social = backend.strategy.storage.user.get_social_auth(backend.name, uid)
+    social = backend.strategy.storage.user.get_social_auth(
+        backend.name, uid, id_key=id_key
+    )
     if intent == backend.name:
         if _reaches_other_account(backend, uid, user, social):
             logger.info(

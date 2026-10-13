@@ -158,7 +158,9 @@ class SocialIntegrationTests(APITestCase):
     @responses.activate
     def test_complete_existing_user(self):
         user = User.objects.create(username="adminer", email="admin@betahaus.net")
-        usa = user.social_auth.create(uid="123", provider="idproxy")
+        usa = user.social_auth.create(
+            uid="123", provider="idproxy", id_key="identity_id"
+        )
         response = self.client.post("/login/idproxy/")
         location = response.get("Location")
         parsed = parse_qs(location)
@@ -197,7 +199,7 @@ class SocialIntegrationTests(APITestCase):
         user = self.organisation.users.create(
             username="adminer", email="admin@betahaus.net"
         )
-        user.social_auth.create(uid="123", provider="idproxy")
+        user.social_auth.create(uid="123", provider="idproxy", id_key="identity_id")
         response = self.client.post("/login/idproxy/")
         location = response.get("Location")
         parsed = parse_qs(location)
@@ -302,7 +304,7 @@ class SocialIntegrationTests(APITestCase):
         self.organisation.active = False
         self.organisation.save()
         user = User.objects.create(username="adminer", email="admin@betahaus.net")
-        user.social_auth.create(uid="123", provider="idproxy")
+        user.social_auth.create(uid="123", provider="idproxy", id_key="identity_id")
         response = self.client.post("/login/idproxy/")
         location = response.get("Location")
         parsed = parse_qs(location)
@@ -328,7 +330,7 @@ class SocialIntegrationTests(APITestCase):
     @responses.activate
     def test_bump_permission(self):
         user = User.objects.create(username="adminer", email="admin@betahaus.net")
-        user.social_auth.create(uid="123", provider="idproxy")
+        user.social_auth.create(uid="123", provider="idproxy", id_key="identity_id")
         response = self.client.post("/login/idproxy/")
         location = response.get("Location")
         parsed = parse_qs(location)
@@ -434,7 +436,7 @@ class SocialIntegrationTests(APITestCase):
         forgotten_user = self.organisation.users.create(
             username="old_user", email="forgotten@betahaus.net", identity_id="def"
         )
-        user.social_auth.create(uid="123", provider="idproxy")
+        user.social_auth.create(uid="123", provider="idproxy", id_key="identity_id")
         response = self.client.post("/login/idproxy/")
         location = response.get("Location")
         parsed = parse_qs(location)
@@ -466,7 +468,7 @@ class SocialIntegrationTests(APITestCase):
     @responses.activate
     def test_email_updated_when_not_in_extra_data(self):
         user = User.objects.create(username="adminer", email="wrong@betahaus.net")
-        user.social_auth.create(uid="123", provider="idproxy")
+        user.social_auth.create(uid="123", provider="idproxy", id_key="identity_id")
         response = self.client.post("/login/idproxy/")
         location = response.get("Location")
         parsed = parse_qs(location)
@@ -493,7 +495,7 @@ class SocialIntegrationTests(APITestCase):
     @responses.activate
     def test_email_cleared_when_no_emails_in_extra_data(self):
         user = User.objects.create(username="adminer", email="admin@betahaus.net")
-        user.social_auth.create(uid="123", provider="idproxy")
+        user.social_auth.create(uid="123", provider="idproxy", id_key="identity_id")
         response = self.client.post("/login/idproxy/")
         location = response.get("Location")
         parsed = parse_qs(location)
@@ -523,7 +525,9 @@ class SocialIntegrationTests(APITestCase):
             username="social_user",
             email="admin@betahaus.net",
         )
-        usa = social_user.social_auth.create(uid="123", provider="idproxy")
+        usa = social_user.social_auth.create(
+            uid="123", provider="idproxy", id_key="identity_id"
+        )
         authenticated_user = self.organisation.users.create(
             username="auth", email="admin@betahaus.net", identity_id="123"
         )

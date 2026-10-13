@@ -552,7 +552,12 @@ class ScoutIDLoginTests(APITestCase):
     @responses.activate
     def test_a_new_sub_with_the_same_member_no_finds_the_same_account(self):
         user = self.org.users.create(username="kim", is_active=True)
-        user.social_auth.create(provider=SCOUTID_PROVIDER, uid="9876543", extra_data={})
+        user.social_auth.create(
+            provider=SCOUTID_PROVIDER,
+            uid="9876543",
+            id_key=SCOUTNET_MEMBER_NO,
+            extra_data={},
+        )
         before = self.org.users.count()
         state, nonce = self._begin()
         self.realm.register(
@@ -631,7 +636,10 @@ class ScoutIDLoginTests(APITestCase):
             username="kim", identity_id="an-id-proxy-identity", is_active=True
         )
         user.social_auth.create(
-            provider=IDPROXY_PROVIDER, uid="an-id-proxy-identity", extra_data={}
+            provider=IDPROXY_PROVIDER,
+            uid="an-id-proxy-identity",
+            id_key="identity_id",
+            extra_data={},
         )
         return user
 
