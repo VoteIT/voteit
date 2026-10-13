@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.4 (unreleased)
+## 1.4.0 (2026-10-14)
 
 Login flow, upgraded to social-auth-core 6 / social-auth-app-django 7.
 
@@ -8,14 +8,14 @@ Login flow, upgraded to social-auth-core 6 / social-auth-app-django 7.
   token from origins the provider trusts - `get_login_origins()`.
 - **Standard login flow via IDProxy**: The /o/authorize/ page handles any quirks instead, so login can be initiated normally.
 
-## v1.3 (2026-10-09)
+## 1.3 (2026-10-09)
 
 Organisation-specific layout
 
 - **Logo and primary color** per organisation. Shown in few places so far, so this functionality is a stub.
 - **Bugfix** - `ensure_userid` was run before name fields saved, so it was empty the first time.
 
-## v1.2 (2026-09-29)
+## 1.2 (2026-09-29)
 
 Terms of service.
 
@@ -24,7 +24,7 @@ Terms of service.
   New `/api/terms-of-service/` and `/api/global-terms-of-service/`.
 - `AgendaItem.related_modified` is no longer a field, it's looked up instead.
 
-## v1.1 (2026-09-28)
+## 1.1 (2026-09-28)
 
 Multiple login providers per organisation.
 
@@ -41,7 +41,7 @@ Multiple login providers per organisation.
 - Weekly job deletes meetings that never started and have been pending deletion
   for more than 7 days.
 
-## v1.0 (2026-09-14)
+## 1.0 (2026-09-14)
 
 Replaces the `channels-envelope` websocket library with
 [chanx](https://pypi.org/project/chanx/), and upgrades pydantic from v1 to v2.
