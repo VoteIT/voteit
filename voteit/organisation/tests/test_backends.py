@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory
 from django.test import TestCase
+from social_core.exceptions import AuthResponseError
 from social_django.storage import BaseDjangoStorage
 from social_django.strategy import DjangoStrategy
 
@@ -36,3 +37,10 @@ class IDProxyBackendTests(TestCase):
         strategy = DjangoStrategy(BaseDjangoStorage, request=request)
         backend = self._cut(strategy=strategy)
         self.assertEqual(["email", "hello", "identity", "world"], backend.get_scope())
+
+    def test_get_user_id_requires_identity_id(self):
+        backend = self._cut()
+        self.assertEqual("abc", backend.get_user_id({}, {"identity_id": "abc"}))
+        for response in ({}, {"identity_id": None}, {"identity_id": ""}):
+            with self.assertRaises(AuthResponseError):
+                backend.get_user_id({}, response)

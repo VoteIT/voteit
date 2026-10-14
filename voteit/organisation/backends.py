@@ -157,6 +157,8 @@ class IDProxyOAuth2(OrganisationBackendMixin, BaseOAuth2):
     TITLE = "VoteIT ID"
     REDIRECT_STATE = False
     ID_KEY = "identity_id"
+    # Without it a response lacking identity_id yields None, stored as uid "None"
+    REQUIRES_USER_ID = True
     AUTHORIZATION_URL = "https://id.voteit.se/o/authorize/"
     ACCESS_TOKEN_URL = "https://id.voteit.se/o/token/"
     IDENTITY_URL = "https://id.voteit.se/api/identity/"
