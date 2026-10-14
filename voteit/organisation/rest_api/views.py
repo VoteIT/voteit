@@ -5,8 +5,10 @@ from typing import TYPE_CHECKING
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.db import transaction
+from django.utils.decorators import method_decorator
 from django.utils.timezone import now
 from django.utils.translation import gettext as _
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import exceptions
 from rest_framework import mixins
@@ -83,6 +85,8 @@ class OrganisationViewSet(
             return self.request.user.organisation
         return get_object_or_404(Organisation.objects, host=hostname)
 
+    # The SPA posts provider logins as a form, with the token from this cookie
+    @method_decorator(ensure_csrf_cookie)
     def list(self, request, *args, **kwargs):
         """
         A list that may contain one item, but no more.

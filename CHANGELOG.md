@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.4.2 (2026-10-14)
+
+- **Bugfix** - `GET /api/organisation/` sets the `csrftoken` cookie. Nothing else
+  did, so in a fresh browser the login form was posted without a token and got a 403.
+
 ## 1.4.1 (2026-10-14)
 
 - **uvicorn 0.54**: `--ws auto` now picks the `websockets-sansio` implementation.

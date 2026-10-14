@@ -68,8 +68,9 @@ class BeginViewTests(TestCase):
         self.assertEqual(403, response.status_code)
 
     def test_same_origin_post_with_token(self):
-        token = "a" * 32
-        self.client.cookies["csrftoken"] = token
+        # A fresh browser gets its token from the organisation endpoint
+        self.assertEqual(200, self.client.get("/api/organisation/").status_code)
+        token = self.client.cookies["csrftoken"].value
         response = self.client.post(
             f"/login/{IDPROXY_PROVIDER}/",
             {"csrfmiddlewaretoken": token},
