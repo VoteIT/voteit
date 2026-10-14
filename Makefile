@@ -72,3 +72,5 @@ envtest:
 	DJANGO_SETTINGS_MODULE=project.settings \
 	HOST=.voteit.se \
 	&& python manage.py test voteit --keepdb --failfast
+outdated:
+	uv tree --outdated --depth 1
