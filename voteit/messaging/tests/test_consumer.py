@@ -14,7 +14,9 @@ from importlib import import_module
 from unittest.mock import patch
 
 from asgiref.sync import sync_to_async
+from channels.layers import get_channel_layer
 from chanx.channels.testing import WebsocketTestCase
+from chanx.channels.utils import get_websocket_application
 from django.db import transaction
 from django.conf import settings
 from django.test import override_settings
@@ -22,13 +24,16 @@ from django.contrib.auth import get_user_model
 from fakeredis import FakeRedis
 from rq import Queue
 from rq import SimpleWorker
+from uvicorn.protocols.utils import ClientDisconnected
 
 from voteit.agenda.messages import AgendaChanged
+from voteit.core.messages.notice import Notice
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
+from voteit.messaging.channels import UserChannel
 from voteit.messaging.channels import user_group
 from voteit.messaging.consumer import VoteitConsumer
 from voteit.messaging.messages import ChannelLeave
@@ -707,6 +712,133 @@ class CloseConnectionTests(ConsumerTestCase):
             {"type": "websocket.close", "code": NORMAL_CLOSURE},
             await communicator.receive_output(),
         )
+
+
+class UvicornSend:
+    """Refuse sends after a close the way uvicorn does.
+
+    The test communicator accepts anything, which hides the error. Setting
+    ``client_gone`` stands in for uvicorn having seen the client drop.
+    """
+
+    def __init__(self, app):
+        self.app = app
+        self.client_gone = False
+        self.refused = 0
+        # uvicorn raises this once for a send that hits the closed connection.
+        self.disconnected = False
+
+    async def __call__(self, scope, receive, send):
+        async def strict_send(message):
+            if self.disconnected:
+                self.disconnected = False
+                self.client_gone = True
+                self.refused += 1
+                raise ClientDisconnected
+            if self.client_gone:
+                self.refused += 1
+                raise RuntimeError(
+                    f"Unexpected ASGI message '{message['type']}', after sending "
+                    "'websocket.close' or response already completed."
+                )
+            if message["type"] == "websocket.close":
+                self.client_gone = True
+            await send(message)
+
+        await self.app(scope, receive, strict_send)
+
+
+class SocketGoneTests(ConsumerTestCase):
+    """A send to a socket that has gone is dropped, not fatal.
+
+    Before, the error ended the consumer and websocket_disconnect never ran.
+    """
+
+    def setUp(self):
+        super().setUp()
+        # Patched before connecting: the dispatch loop binds the method once.
+        self.dispatched = None
+        original = VoteitConsumer.dispatch
+
+        async def dispatch(consumer, message):
+            try:
+                await original(consumer, message)
+            finally:
+                if self.dispatched and not message["type"].startswith("websocket."):
+                    self.dispatched.set()
+
+        dispatch_patch = patch.object(VoteitConsumer, "dispatch", dispatch)
+        dispatch_patch.start()
+        self.addCleanup(dispatch_patch.stop)
+
+    def create_communicator(self, **kwargs):
+        self.server = UvicornSend(get_websocket_application())
+        return super().create_communicator(router=self.server, **kwargs)
+
+    async def _publish_and_wait(self):
+        """Publish to the user and wait until the consumer has dispatched it.
+
+        Without waiting, a websocket.disconnect queued right after could be
+        dispatched first, and the send would never be attempted.
+        """
+        self.dispatched = asyncio.Event()
+        await sync_to_async(UserChannel(self.moderator.pk).sync_publish)(
+            Notice(payload={"message": "Hello"}), on_commit=False
+        )
+        await asyncio.wait_for(self.dispatched.wait(), 2)
+
+    async def test_client_gone_before_a_broadcast(self):
+        communicator = await self._connect(self.moderator)
+        self.server.client_gone = True
+        await self._publish_and_wait()
+        await communicator.disconnect()
+        conn = await Connection.objects.filter(user_id=self.moderator.pk).afirst()
+        self.assertIsNotNone(conn.code)
+
+    async def test_client_disconnected_mid_send(self):
+        communicator = await self._connect(self.moderator)
+        self.server.disconnected = True
+        await self._publish_and_wait()
+        await self._publish_and_wait()
+        # The second send is dropped before it reaches the server.
+        self.assertEqual(1, self.server.refused)
+        await communicator.disconnect()
+        conn = await Connection.objects.filter(user_id=self.moderator.pk).afirst()
+        self.assertIsNotNone(conn.code)
+
+    async def test_broadcast_after_server_close(self):
+        communicator = await self._connect(self.moderator)
+        await sync_to_async(VoteitConsumer.broadcast_event_sync)(
+            CloseConnection(), user_group(self.moderator.pk)
+        )
+        await communicator.receive_all_messages(stop_action="s.closing", timeout=2)
+        await communicator.receive_output()
+        await self._publish_and_wait()
+        # On the typed event path chanx catches the error and only logs it,
+        # so the consumer survives either way. What matters is the attempt.
+        self.assertEqual(0, self.server.refused)
+        await communicator.disconnect()
+
+
+class DisconnectGroupTests(ConsumerTestCase):
+    async def test_every_group_is_left(self):
+        communicator = await self._connect(self.participant)
+        await self._subscribe(communicator, "participants", self.meeting.pk)
+        conn = await Connection.objects.filter(user_id=self.participant.pk).afirst()
+        layer = get_channel_layer()
+        member_of = [g for g, chs in layer.groups.items() if conn.channel_name in chs]
+        self.assertIn(user_group(self.participant.pk), member_of)
+        self.assertIn(ParticipantsChannel(self.meeting.pk).channel_name, member_of)
+        self.assertEqual(3, len(member_of))  # plus the session group
+        await communicator.disconnect()
+        self.assertEqual(
+            [], [g for g, chs in layer.groups.items() if conn.channel_name in chs]
+        )
+
+    async def test_anonymous_disconnect(self):
+        communicator = await self._connect()
+        await communicator.assert_closed()
+        await communicator.disconnect()
 
 
 class OrganisationAutoSubscribeTests(ConsumerTestCase):

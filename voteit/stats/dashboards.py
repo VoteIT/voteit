@@ -21,6 +21,7 @@ from django.utils.functional import cached_property
 from voteit.messaging.models import GOING_AWAY
 from voteit.messaging.models import NORMAL_CLOSURE
 from voteit.messaging.models import ABNORMAL_CLOSURE
+from voteit.messaging.models import NO_STATUS_RECEIVED
 from voteit.messaging.models import LOGGED_OUT
 from voteit.messaging.models import LOGGED_OUT_EVERYWHERE
 from voteit.messaging.models import Connection
@@ -438,6 +439,7 @@ class CloseCodeChart(ClosedLast24Mixin, widgets.BarChart):
     code_labels = {
         NORMAL_CLOSURE: f"{NORMAL_CLOSURE} normal",
         GOING_AWAY: f"{GOING_AWAY} going away",
+        NO_STATUS_RECEIVED: f"{NO_STATUS_RECEIVED} no status",
         ABNORMAL_CLOSURE: f"{ABNORMAL_CLOSURE} abnormal",
         LOGGED_OUT: f"{LOGGED_OUT} logged out",
         LOGGED_OUT_EVERYWHERE: f"{LOGGED_OUT_EVERYWHERE} logged out everywhere",

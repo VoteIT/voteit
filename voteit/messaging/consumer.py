@@ -23,6 +23,7 @@ from chanx.core.websocket import ChanxWebsocketConsumerMixin
 from django.conf import settings
 from django.utils.module_loading import autodiscover_modules
 from django.utils.timezone import now
+from uvicorn.protocols.utils import ClientDisconnected
 
 from voteit.core.messages.version import VersionMessage
 from voteit.messaging.bundle import bind_bundle_schema
@@ -143,15 +144,17 @@ class SubscriptionMixin(ChanxWebsocketConsumerMixin):
         )
         return event
 
+    @staticmethod
+    def group_for(ref: ChannelRef) -> str:
+        channel_cls = context_channel_registry.get(ref.channel_type)
+        if channel_cls:
+            return channel_cls(ref.pk).channel_name
+        return f"{ref.channel_type}_{ref.pk}"
+
     @ws_handler(summary="Leave a context channel")
     async def leave(self, message: ChannelLeave) -> ChannelLeft:
         ref = message.payload
-        channel_cls = context_channel_registry.get(ref.channel_type)
-        group = (
-            channel_cls(ref.pk).channel_name
-            if channel_cls
-            else f"{ref.channel_type}_{ref.pk}"
-        )
+        group = self.group_for(ref)
         await self.channel_layer.group_discard(group, self.channel_name)
         self.channel_subs.discard(ref)
         return ChannelLeft(payload={**ref.model_dump(), "channel_name": group})
@@ -275,20 +278,53 @@ class VoteitConsumer(
     passthrough_events = all_outgoing_messages()
 
     user: User | None = None
+    # Set once the ASGI server will refuse further sends, see __call__.
+    socket_gone: bool = False
+
+    async def __call__(self, scope, receive, send):
+        """Drop sends to a socket that is already gone.
+
+        Channel-layer messages keep being dispatched until websocket.disconnect
+        reaches the front of the queue, and chanx runs handlers as detached
+        tasks. Either can send after the client left or after our own close,
+        which uvicorn answers with ClientDisconnected or a RuntimeError. Raised
+        from dispatch, that ends the consumer before websocket_disconnect runs.
+        """
+
+        async def guarded_send(message):
+            if self.socket_gone:
+                return
+            try:
+                await send(message)
+            except ClientDisconnected:
+                self.socket_gone = True
+                return
+            except RuntimeError as exc:
+                if not str(exc).startswith("Unexpected ASGI message"):
+                    raise
+                self.socket_gone = True
+                return
+            if message["type"] == "websocket.close":
+                self.socket_gone = True
+
+        await super().__call__(scope, receive, guarded_send)
 
     async def post_authentication(self) -> None:
         self.user = self.scope["user"]
         self.channel_subs = set()
-        await self.channel_layer.group_add(user_group(self.user.pk), self.channel_name)
+        # Appended to self.groups, a per-instance copy, so that Channels'
+        # websocket_disconnect leaves them again.
+        groups = [user_group(self.user.pk)]
         # The session group is how an ordinary logout closes exactly the tabs
         # that lost their login. session_key is a plain attribute on an already
         # resolved SessionStore, so reading it here costs no I/O. An
         # authenticated scope without one is not expected, but it should mean
         # "no session group" rather than a failed handshake.
         if session_key := getattr(self.scope.get("session"), "session_key", None):
-            await self.channel_layer.group_add(
-                session_group(session_key), self.channel_name
-            )
+            groups.append(session_group(session_key))
+        for group in groups:
+            await self.channel_layer.group_add(group, self.channel_name)
+        self.groups.extend(groups)
         self.last_connection_update = now()
         await Connection.objects.acreate(
             user_id=self.user.pk, channel_name=self.channel_name
@@ -302,6 +338,14 @@ class VoteitConsumer(
             )
         )
         await self.subscribe_to_organisation()
+
+    async def websocket_disconnect(self, message: dict):
+        # Subscriptions are joined by the worker, so they are only tracked in
+        # channel_subs. Without this the dead channel stays in each group until
+        # group_expiry. channel_subs only exists once authenticated.
+        subs = getattr(self, "channel_subs", ())
+        self.groups.extend(g for g in map(self.group_for, subs) if g not in self.groups)
+        await super().websocket_disconnect(message)
 
     async def subscribe_to_organisation(self) -> None:
         """Join the user's own organisation channel without being asked.

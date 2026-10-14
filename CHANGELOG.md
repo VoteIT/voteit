@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.4.1 (2026-10-14)
+
+- **uvicorn 0.54**: `--ws auto` now picks the `websockets-sansio` implementation.
+  It reports a lost connection as 1005 rather than 1006.
+- **Sends to a closed socket are dropped** instead of ending the consumer before
+  `websocket_disconnect` ran (Sentry: "Unexpected ASGI message 'websocket.send'...").
+- **Sockets leave their groups on disconnect**, subscriptions included, instead of
+  lingering until `group_expiry`.
+
 ## 1.4.0 (2026-10-14)
 
 Login flow, upgraded to social-auth-core 6 / social-auth-app-django 7.

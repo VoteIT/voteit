@@ -199,6 +199,12 @@ total, which in production should be zero.
   `tests/test_bundle.py::BundleSchemaTests` is what tells you if it breaks. The
   fallback is the declared `SerializeAsAny[BaseMessage]`, which produces the
   same bytes and a vaguer schema.
+- Sends after the socket has gone -- the client dropped, or we closed it -- are
+  dropped by `VoteitConsumer.__call__`'s send wrapper. uvicorn refuses them, and
+  the error used to end the consumer before `websocket_disconnect` ran.
+- The user and session groups go into `self.groups`, which Channels leaves on
+  disconnect. Subscriptions are joined by the worker, so `websocket_disconnect`
+  adds `channel_subs`' groups to it first.
 - Don't name anything `self.subscriptions` on the consumer; chanx uses it for
   its own topic registry.
 - `UserChannel.model` is bound in `AppConfig.ready()`, not as a classproperty:

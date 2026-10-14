@@ -12,6 +12,9 @@ from django.utils.timezone import now
 # socket that vanished looks like, so it is what we record for one.
 NORMAL_CLOSURE = 1000
 GOING_AWAY = 1001
+# A close frame without a status code. uvicorn's websockets-sansio also reports
+# a lost connection with it, so most of these are sockets that vanished.
+NO_STATUS_RECEIVED = 1005
 ABNORMAL_CLOSURE = 1006
 
 # 4000-4999 is the application-private range. These two say "the session behind
