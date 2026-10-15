@@ -55,8 +55,8 @@ cd voteit
 # 2. Copy the environment template and fill in any secrets
 cp .env.tpl .env
 
-# 3. Install Python dependencies (creates .venv automatically)
-uv sync
+# 3. Install Python dependencies (creates .venv, adds src/voteit_org if checked out)
+make sync
 
 # 4. Start Postgres and Redis
 docker compose up
@@ -93,8 +93,7 @@ voteit/               Main Django project package
   …                   Additional feature apps (reactions, presence, stats, …)
 
 src/
-  voteit_org/         Organisation membership and REST features (workspace package)
-  member_dialects/    Electoral register policy plugins (workspace package)
+  voteit_org/         Organisation membership and REST features (private repo, optional; installed by `make sync`)
   dialect_configs/    YAML meeting configuration profiles
 
 project/              Django project settings and URL configuration
@@ -112,7 +111,7 @@ make up            # Start docker services + RQ worker + dev server
 make down          # Stop docker services
 
 make test          # Run the full test suite (--keepdb --failfast)
-make test-deps     # Run tests for src/ workspace packages
+make test-deps     # Run tests for src/voteit_org (if checked out)
 make coverage      # Run tests with coverage report
 
 make migrations    # makemigrations

@@ -48,7 +48,9 @@ jobs:
           version: "0.12.9"
 
       - name: Build wheels
-        run: uv build --all-packages --wheel -o ./dist
+        run: |
+          uv build --wheel -o ./dist
+          uv build --wheel src/voteit_org -o ./dist
 
       - name: Upload wheels
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -77,13 +79,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          persist-credentials: false
-
-      - name: Checkout / voteit_org
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: voteit/voteit_org
-          path: src/voteit_org
           persist-credentials: false
 
       - name: Download wheels

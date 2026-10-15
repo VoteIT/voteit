@@ -19,9 +19,8 @@ WORKDIR /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     --mount=type=bind,source=uv.lock,target=uv.lock \
-    --mount=type=bind,source=src/voteit_org,target=src/voteit_org \
     --mount=type=bind,source=dist,target=dist \
-    uv sync --frozen --no-dev --group docker --no-install-workspace --no-install-project && \
+    uv sync --frozen --no-dev --group docker --no-install-project && \
     uv pip install dist/*.whl --no-deps
 
 # Clean stage

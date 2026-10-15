@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := install
 .ONESHELL:
-.PHONY: build dev
+.PHONY: build dev sync
 
 install:
 	cat INSTALL.md
@@ -52,11 +52,15 @@ ifneq (,$(filter $(firstword $(MAKECMDGOALS)),test coverage))
 endif
 test-deps:
 	REDIS_CACHE_LOCATION=redis://127.0.0.1:6379/9 POSTGRES_PORT=5433 python manage.py test voteit_org --keepdb --failfast
+sync:
+	uv sync
+	[ ! -d src/voteit_org ] || uv pip install --python .venv --no-deps -e src/voteit_org
 # dist is cleared first: the Dockerfile installs every wheel in it, so a stale
 # voteit_org or older voteit wheel would otherwise end up in the image.
 build:
 	rm -rf dist
-	uv build --all-packages -o ./dist
+	uv build -o ./dist
+	[ ! -d src/voteit_org ] || uv build src/voteit_org -o ./dist
 # No `docker pull` here: the Dockerfile pins its base by digest, so buildkit
 # fetches exactly that and pulling the floating tag would only warm the cache
 # with an image the build does not use.

@@ -6,7 +6,7 @@ VoteIT is a Django-based backend for online democratic decision-making. It suppo
 
 ## Commands
 
-All commands assume the virtualenv is active. Use `uv sync` to install dependencies (creates `.venv`).
+All commands assume the virtualenv is active. Use `make sync` to install dependencies (creates `.venv`). It runs `uv sync` and then installs `src/voteit_org` on top if it is checked out. A plain `uv sync` removes voteit_org again; `uv run` keeps it.
 
 ```bash
 # Dev infrastructure (postgres + redis + the test postgres on 5433)
@@ -45,7 +45,7 @@ make migrate     # migrate
 # Background worker (dev)
 make rqworker
 
-# Build wheels (voteit + voteit_org + member_dialects)
+# Build wheels (voteit, plus voteit_org if checked out)
 make build
 ```
 
@@ -115,8 +115,8 @@ Pluggable per-meeting or per-org features (`MeetingComponent`, `OrganisationComp
 
 ### Key Packages in `src/`
 
-Local editable sub-packages (separate git repos, mounted via uv workspace):
-- `src/voteit_org/` — org-level membership and REST features
+Separate git repos, not declared in `pyproject.toml`:
+- `src/voteit_org/` — org-level membership and REST features. Private repo, optional. Installed as an editable overlay by `make sync` and enabled via `DJANGO_INSTALLED_APPS`. It depends on voteit, never the other way round.
 - `src/dialect_configs/` — YAML dialect configuration files
 
 ### Texts
