@@ -56,6 +56,7 @@ jobs:
     - name: Install dependencies
       run: |
         uv sync --locked
+        uv pip install --no-deps -e src/voteit_org
 
     - name: Django testrunner
       run: |
