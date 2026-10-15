@@ -5,7 +5,7 @@
 install:
 	cat INSTALL.md
 audit:
-	tmp=$$(mktemp) && uv export --frozen --no-dev --no-install-workspace --group docker --no-annotate --no-header -q -o $$tmp && uvx pip-audit -r $$tmp --disable-pip; rm -f $$tmp
+	tmp=$$(mktemp) && uv export --frozen --no-dev --no-emit-project --group docker --no-annotate --no-header -q -o $$tmp && uvx pip-audit -r $$tmp --disable-pip; rm -f $$tmp
 shell:
 	python manage.py shell
 migrations:
@@ -52,7 +52,10 @@ ifneq (,$(filter $(firstword $(MAKECMDGOALS)),test coverage))
 endif
 test-deps:
 	REDIS_CACHE_LOCATION=redis://127.0.0.1:6379/9 POSTGRES_PORT=5433 python manage.py test voteit_org --keepdb --failfast
+# dist is cleared first: the Dockerfile installs every wheel in it, so a stale
+# voteit_org or older voteit wheel would otherwise end up in the image.
 build:
+	rm -rf dist
 	uv build --all-packages -o ./dist
 # No `docker pull` here: the Dockerfile pins its base by digest, so buildkit
 # fetches exactly that and pulling the floating tag would only warm the cache
