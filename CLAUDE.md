@@ -6,7 +6,7 @@ VoteIT is a Django-based backend for online democratic decision-making. It suppo
 
 ## Commands
 
-All commands assume the virtualenv is active. Use `make sync` to install dependencies (creates `.venv`). It runs `uv sync` and then installs `src/voteit_org` on top if it is checked out. A plain `uv sync` removes voteit_org again; `uv run` keeps it.
+All commands assume the virtualenv is active. Use `make sync` to install dependencies (creates `.venv`). It runs `uv sync` and then installs every package under `src/` that has a `pyproject.toml` (e.g. `voteit_org`) on top. A plain `uv sync` removes them again; `uv run` keeps them.
 
 ```bash
 # Dev infrastructure (postgres + redis + the test postgres on 5433)
@@ -45,7 +45,7 @@ make migrate     # migrate
 # Background worker (dev)
 make rqworker
 
-# Build wheels (voteit, plus voteit_org if checked out)
+# Build wheels (voteit, plus every package under src/)
 make build
 ```
 
