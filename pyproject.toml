@@ -14,15 +14,15 @@ classifiers = [
     "Programming Language :: Python :: 3.14",
 ]
 dependencies = [
-    "chanx (>=2.7.1,<3.0.0)",
-    "stvpoll (>=0.4.6,<0.5.0)",
+    "chanx[channels] (>=2.7.1,<3.0.0)",
+    "stvpoll (>=0.5.6,<0.6.0)",
     "rules (>=3.5,<4.0)",
     "pyyaml (>=6.0.3,<7.0.0)",
     "pydantic[email] (>=2.12,<3)",
     "rq (>=2.6.0,<3.0.0)",
     "django-auditlog (>=3.3.0,<4.0.0)",
-    "django-rq (>=3.1,<4.0)",
-    "django-filter (>=25.2,<26.0)",
+    "django-rq (>=4.2,<5.0)",
+    "django-filter (>=26.2,<27.0)",
     "django-model-utils (>=5.0.0,<6.0.0)",
     "djangorestframework (>=3.16.1,<4.0.0)",
     "django-cors-headers (>=4.9.0,<5.0.0)",
@@ -33,8 +33,6 @@ dependencies = [
     "psycopg[binary,pool] (>=3.2.12,<4.0.0)",
     "bs4 (>=0.0.2,<0.0.3)",
     "python-json-logger (>=4.0.0,<5.0.0)",
-    "structlog (>=25.5.0,<26.0.0)",
-    "pyhumps (>=3.8.0,<4.0.0)",
     "lxml (>=6.0.2,<7.0.0)",
     "nh3 (>=0.3.1,<0.4.0)",
     "social-auth-app-django<8.0.0",
@@ -45,7 +43,7 @@ dependencies = [
     "python-magic>=0.4.27",
     "djangorestframework-api-key>=3.1.0",
     "python-statemachine>=3.1.2",
-    "redis<8",
+    "redis (>=8.1,<9.0)",
     "social-auth-core<7.0.0",
 ]
 
@@ -86,12 +84,12 @@ dev = [
     "daphne (>=4.2.1,<5.0.0)",
     "django-hijack (>=3.7.4,<4.0.0)",
     "ipython (>=9.6.0,<10.0.0)",
-    "ruff (>=0.13.3,<0.14.0)",
+    "ruff (>=0.17.0,<0.18.0)",
     "python-dotenv (>=1.1.1,<2.0.0)",
     "coverage (>=7.10.7,<8.0.0)",
     "fakeredis (>=2.32.0,<3.0.0)",
     "personnummer (>=3.2.1,<4.0.0)",
-    "responses (>=0.25.8,<0.26.0)",
+    "responses (>=0.26.3,<0.27.0)",
     "pre-commit (>=4.3.0,<5.0.0)",
     "djangorestframework-stubs>=3.16.9",
     "chanx[cli]>=2.7.1,<3.0.0",
@@ -135,6 +133,8 @@ exclude_also = [
 
 [tool.ruff]
 include = ["pyproject.toml", "voteit/**/*.py", "src/**/*.py", "locust/*.py"]
+# Ruff 0.17 widened its default rule set; keep the pre-0.17 defaults.
+lint.select = ["E4", "E7", "E9", "F"]
 lint.isort.force-single-line = true
 # E402: load_dotenv() must run before "from .settings import *" so that
 # settings can read the environment.

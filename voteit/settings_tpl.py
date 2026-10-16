@@ -121,8 +121,14 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            # "hosts": ["redis://:127.0.0.1:6379/0"], <- Doesn't work
-            "hosts": [("redis", 6379)],
+            # socket_timeout: see project/settings.py
+            "hosts": [
+                {
+                    "address": "redis://redis:6379/0",
+                    "protocol": 2,
+                    "socket_timeout": None,
+                }
+            ],
         },
     },
 }

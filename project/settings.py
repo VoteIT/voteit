@@ -140,7 +140,15 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [(REDIS_CHANNEL_HOST, 6379)],
+            "hosts": [
+                {
+                    "address": f"redis://{REDIS_CHANNEL_HOST}:6379/0",
+                    "protocol": 2,
+                    # redis-py 8 defaults to 5s, which cuts off channels-redis'
+                    # blocking BZPOPMIN (also 5s) and ends idle consumers.
+                    "socket_timeout": None,
+                }
+            ],
             "capacity": 1500,  # default 100
             "expiry": 60,  # default 60
             "group_expiry": 86400,  # default 86400

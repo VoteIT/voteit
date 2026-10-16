@@ -6,7 +6,7 @@ load_dotenv()
 from .settings import *
 
 CSRF_TRUSTED_ORIGINS = ["http://localhost:3000", "http://voteit.localhost:3000"]
-CHANNEL_LAYERS["default"]["CONFIG"]["hosts"] = [("127.0.0.1", 6379)]
+CHANNEL_LAYERS["default"]["CONFIG"]["hosts"][0]["address"] = "redis://127.0.0.1:6379/0"
 DATABASES["default"]["HOST"] = "localhost"
 MEETING_DIALECTS_DIR = os.path.join(BASE_DIR, "src", "dialect_configs", "dialects")
 
