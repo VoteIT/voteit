@@ -69,6 +69,10 @@ SITE_ID = 1
 SOCIAL_AUTH_JSONFIELD_ENABLED = True
 SOCIAL_AUTH_FIELDS_STORED_IN_SESSION = ["next"]
 SOCIAL_AUTH_USERNAME_IS_FULL_EMAIL = False
+#: Everything user_details would otherwise set in a second save
+SOCIAL_AUTH_USER_FIELDS = ["username", "email", "first_name", "last_name", "img_url"]
+#: Users may change their names locally. user_details only fills in empty ones.
+SOCIAL_AUTH_IMMUTABLE_USER_FIELDS = ["first_name", "last_name"]
 #: social_django's 0020_backfill_id_keys only knows the built-in backends.
 #: Must match each backend's ID_KEY, or old associations stop resolving.
 SOCIAL_AUTH_OLD_ID_KEYS = {
@@ -85,6 +89,7 @@ for env_k, env_v in os.environ.items():
 SOCIAL_AUTH_PIPELINE = [
     "voteit.organisation.pipeline.org_active",
     "social_core.pipeline.social_auth.social_details",
+    "social_core.pipeline.social_auth.social_names",
     "social_core.pipeline.social_auth.social_uid",
     # "social_core.pipeline.social_auth.auth_allowed",
     # "social_core.pipeline.social_auth.social_user",
@@ -99,7 +104,7 @@ SOCIAL_AUTH_PIPELINE = [
     "social_core.pipeline.social_auth.associate_user",
     "social_core.pipeline.social_auth.load_extra_data",
     "social_core.pipeline.user.user_details",
-    # Builds the userid from the name, which user_details sets
+    # create_user sets the userid; this covers existing users without one
     "voteit.organisation.pipeline.ensure_userid",
     "voteit.organisation.pipeline.inherit_users",
     "voteit.organisation.pipeline.bump_permissions",

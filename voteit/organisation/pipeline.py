@@ -83,6 +83,10 @@ def social_user(backend, uid, user=None, *args, id_key="", **kwargs):
     up in it. Every other backend resolves by credential alone, which is what
     stock PSA does -- matching one of those to an existing account is the
     account matcher's job, not this step's.
+
+    Unlike upstream (6.1) this doesn't resolve ``legacy_identifiers``. Old rows
+    got their id_key from ``SOCIAL_AUTH_OLD_ID_KEYS``; changing a backend's
+    ID_KEY again needs that lookup added here.
     """
     provider = backend.name
     social = backend.strategy.storage.user.get_social_auth(provider, uid, id_key=id_key)
@@ -345,9 +349,11 @@ def match_existing_user(
 def create_user(strategy, details, backend, uid, user=None, *args, **kwargs):
     if user:
         return {"is_new": False}
+    # None means the provider didn't say, so the model default applies
     fields = {
-        name: kwargs.get(name, details.get(name))
+        name: value
         for name in backend.setting("USER_FIELDS", ["username", "email"])
+        if (value := kwargs.get(name, details.get(name))) is not None
     }
     if not fields:
         return
@@ -356,6 +362,16 @@ def create_user(strategy, details, backend, uid, user=None, *args, **kwargs):
         # identity_id is an id proxy identifier. An account created by any other
         # provider simply has none, and is reached through its UserSocialAuth.
         fields["identity_id"] = uid
+    # Here rather than in ensure_userid, which would save the user a second time
+    from voteit.core.utils import generate_valid_userid
+
+    unsaved = User(
+        organisation=organisation,
+        first_name=fields.get("first_name", ""),
+        last_name=fields.get("last_name", ""),
+    )
+    if userid := generate_valid_userid(unsaved):
+        fields["userid"] = userid
     return {
         "is_new": True,
         "user": strategy.create_user(organisation=organisation, **fields),

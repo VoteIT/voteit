@@ -198,9 +198,6 @@ class IDProxyOAuth2(OrganisationBackendMixin, BaseOAuth2):
         )
 
     def get_user_details(self, response):
-        fullname, first_name, last_name = self.get_user_names(
-            "", response.get("given_name"), response.get("family_name")
-        )
         email = ""
         for ud in response.get("user_data", {}):
             if ud.get("scope") == "email":
@@ -208,9 +205,9 @@ class IDProxyOAuth2(OrganisationBackendMixin, BaseOAuth2):
                 break
         return {
             "email": email,
-            "fullname": fullname,
-            "first_name": first_name,
-            "last_name": last_name,
+            # Raw, the social_names step fills in the rest. None leaves a name alone.
+            "first_name": response.get("given_name"),
+            "last_name": response.get("family_name"),
             "img_url": response.get("img_url"),  # None is acceptable here
         }
 

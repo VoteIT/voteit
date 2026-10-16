@@ -3,6 +3,7 @@ from urllib.parse import parse_qs
 
 import responses
 from django.conf import settings
+from django.db.models.signals import post_save
 from django.contrib.auth import get_user_model
 from django.test import override_settings
 from django.utils.timezone import now
@@ -119,6 +120,66 @@ class SocialIntegrationTests(APITestCase):
         )
         self.assertEqual(usa.uid, user.identity_id)
         self.assertEqual("admin@betahaus.net", user.email)
+
+    def _complete(self, identity_json=_IDENTITY_RESPONSE_JSON):
+        response = self.client.post("/login/idproxy/")
+        state = parse_qs(response.get("Location"))["state"][0]
+        responses.add(
+            responses.POST,
+            "https://idproxy/o/token/",
+            json={"access_token": "knock knock"},
+        )
+        responses.add(
+            responses.GET, "https://idproxy/api/identity/", json=identity_json
+        )
+        return self.client.get("/complete/idproxy/", data={"state": state})
+
+    @responses.activate
+    def test_complete_new_user_saves_once(self):
+        saves = []
+
+        def on_save(*, created, update_fields=None, **kwargs):
+            if not created:
+                saves.append(update_fields)
+
+        post_save.connect(on_save, sender=User)
+        try:
+            self.assertEqual(302, self._complete().status_code)
+        finally:
+            post_save.disconnect(on_save, sender=User)
+        # Only login() touches it after create
+        self.assertEqual([{"last_login"}], saves)
+        user = User.objects.get(social_auth__uid="123")
+        self.assertEqual("admin-with-pass-admin", user.userid)
+        self.assertEqual("https://image/picture.png", user.img_url)
+
+    @responses.activate
+    def test_complete_without_a_given_name_keeps_the_one_stored(self):
+        user = User.objects.create(
+            username="adminer", first_name="Admin", organisation=self.organisation
+        )
+        user.social_auth.create(uid="123", provider="idproxy", id_key="identity_id")
+        identity = {**_IDENTITY_RESPONSE_JSON}
+        del identity["given_name"]
+        self.assertEqual(302, self._complete(identity).status_code)
+        user.refresh_from_db()
+        self.assertEqual("Admin", user.first_name)
+        self.assertEqual("with pass 'admin'", user.last_name)
+
+    @responses.activate
+    def test_complete_keeps_names_changed_locally(self):
+        user = User.objects.create(
+            username="adminer",
+            first_name="Changed",
+            last_name="",
+            organisation=self.organisation,
+        )
+        user.social_auth.create(uid="123", provider="idproxy", id_key="identity_id")
+        self.assertEqual(302, self._complete().status_code)
+        user.refresh_from_db()
+        self.assertEqual("Changed", user.first_name)
+        # An empty one is still filled in
+        self.assertEqual("with pass 'admin'", user.last_name)
 
     @responses.activate
     def test_complete_new_user_must_accept_tos(self):
