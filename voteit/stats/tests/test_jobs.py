@@ -30,7 +30,7 @@ class PopulateJobTests(TestCase):
         if date is None:
             date = timezone.now()
         populate_history_log(date=date)
-        return HistoryLog.objects.get(date=date)
+        return HistoryLog.objects.get(date=date.date())
 
     def test_unique(self):
         Connection.objects.create(
@@ -42,7 +42,7 @@ class PopulateJobTests(TestCase):
         self.assertEqual(HistoryLog.objects.all().count(), 1)
         self._do_job()  # Ignores existing log...
         with self.assertRaises(IntegrityError):
-            HistoryLog.objects.create(date=timezone.now())
+            HistoryLog.objects.create(date=timezone.now().date())
 
     def test_connections(self):
         Connection.objects.create(user_id=self.moderator.pk, last_action=timezone.now())
