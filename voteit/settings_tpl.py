@@ -25,7 +25,6 @@ TEMPLATES = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.middleware.locale.LocaleMiddleware",
@@ -51,7 +50,6 @@ INSTALLED_APPS = [
     "django_filters",
     "channels",
     "chanx.channels",
-    "corsheaders",
     "auditlog",
     "django_rq",
     "social_django",
