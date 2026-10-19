@@ -1,5 +1,6 @@
 from collections import Counter
 from collections.abc import Iterator
+from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
 
@@ -63,6 +64,10 @@ def populate_history_log(
 
     if date is None:
         date = timezone.now() - timedelta(days=1)
+    elif timezone.is_aware(date):
+        date = date.astimezone(UTC)
+    # Stats days are UTC. Saving the datetime would let DateField pick the local date.
+    day = date.date()
     proposal_ct = ContentType.objects.get_by_natural_key("proposal", "proposal")
     user_ct = ContentType.objects.get_for_model(User)
 
@@ -82,7 +87,7 @@ def populate_history_log(
     # HistoryLog already exists
     history_exists = HistoryLog.objects.filter(
         org_id=models.OuterRef("pk"),
-        date=date,
+        date=day,
     )
 
     for org in Organisation.objects.filter(
@@ -108,7 +113,7 @@ def populate_history_log(
         proposal_outcome_counter.pop(ProposalStateMachine.published.value, None)
 
         HistoryLog.objects.create(
-            date=date,
+            date=day,
             org=org,
             # Data fields
             accepted_invitation_count=MeetingInvite.objects.filter(

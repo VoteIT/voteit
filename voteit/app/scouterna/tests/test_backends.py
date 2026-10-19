@@ -550,6 +550,23 @@ class ScoutIDLoginTests(APITestCase):
         self.assertEqual("9876543", social.uid)
 
     @responses.activate
+    def test_complete_splits_a_full_name(self):
+        # social_names' job, nobody else splits it since social_core 6
+        state, nonce = self._begin()
+        self.realm.register(
+            self.realm.id_token("voteit", nonce),
+            userinfo={
+                "sub": "b4d3e2f1-0000-4000-8000-000000000001",
+                "name": "Kim Scout",
+            },
+        )
+        self.client.get("/complete/scoutid/", data={"state": state, "code": "code"})
+        user = User.objects.get(social_auth__uid="9876543")
+        self.assertEqual("Kim", user.first_name)
+        self.assertEqual("Scout", user.last_name)
+        self.assertEqual("kim-scout", user.userid)
+
+    @responses.activate
     def test_a_new_sub_with_the_same_member_no_finds_the_same_account(self):
         user = self.org.users.create(username="kim", is_active=True)
         user.social_auth.create(

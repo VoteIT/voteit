@@ -25,7 +25,6 @@ TEMPLATES = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.middleware.locale.LocaleMiddleware",
@@ -51,7 +50,6 @@ INSTALLED_APPS = [
     "django_filters",
     "channels",
     "chanx.channels",
-    "corsheaders",
     "auditlog",
     "django_rq",
     "social_django",
@@ -121,8 +119,14 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            # "hosts": ["redis://:127.0.0.1:6379/0"], <- Doesn't work
-            "hosts": [("redis", 6379)],
+            # socket_timeout: see project/settings.py
+            "hosts": [
+                {
+                    "address": "redis://redis:6379/0",
+                    "protocol": 2,
+                    "socket_timeout": None,
+                }
+            ],
         },
     },
 }
@@ -181,6 +185,8 @@ RQ_QUEUES = {
         "DEFAULT_RESULT_TTL": 3600 * 24 * 7,
     },
 }
+#: django-rq 4 defaults to "on_db_commit". Keep enqueueing immediately, as before.
+RQ = {"COMMIT_MODE": "auto"}
 
 # How long (seconds) to coalesce bursts of votes on the same poll before
 # broadcasting an updated PollStatus - see voteit.poll.jobs.

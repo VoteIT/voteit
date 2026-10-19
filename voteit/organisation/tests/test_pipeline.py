@@ -5,6 +5,7 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from social_core.exceptions import AuthException
+from django.utils.timezone import localdate
 from django.utils.timezone import now
 from social_django.models import UserSocialAuth
 
@@ -774,7 +775,7 @@ class RequireTosAcceptTests(TestCase):
         self.org.tos.create(version=now() - timedelta(days=1))
         accept_tos(self.user)
         GlobalTermsOfService.objects.create(
-            required_from=now().date() + timedelta(days=1)
+            required_from=localdate() + timedelta(days=1)
         )
         self.assertEqual({}, self._run(self.user))
 

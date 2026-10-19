@@ -198,7 +198,9 @@ ID-proxy service endpoint. Requires `HasIDProxyAPIKey`. Accepts `?identity_in=ui
 
 ## Authentication Pipeline (`pipeline.py`)
 
-Custom PSA pipeline steps used in `SOCIAL_AUTH_PIPELINE`:
+Custom PSA pipeline steps used in `SOCIAL_AUTH_PIPELINE`. The stock `social_names` step (required since social_core 6) runs right after `social_details`: backends return the names they got, `None` for missing ones, and it fills in the rest — splitting a full name, for one. Never return `""` for a missing name, `user_details` would write it over the stored one.
+
+Users may change their names locally (`UpdateUserSerializer`), so `SOCIAL_AUTH_IMMUTABLE_USER_FIELDS = ["first_name", "last_name"]`: the stock `user_details` only fills them in while they are empty. `email` is protected by PSA's defaults; for the id proxy `remove_nonmatching_email` keeps it within the validated addresses. `img_url` is not editable here and follows the provider.
 
 - `LoginRefused` — the `AuthPolicyError` the steps below raise when a refusal is meant for the person logging in. Since social_core 6 every `SocialAuthBaseException` stringifies to a generic reason and keeps what it was given in `.detail`; `SocialAuthExceptionMiddleware` renders `str(exception)`, so this subclass returns `.detail` instead.
 - `org_active` — raises `LoginRefused` if `backend.organisation.active` is `False`.
@@ -209,8 +211,8 @@ Custom PSA pipeline steps used in `SOCIAL_AUTH_PIPELINE`:
 
   Every other backend returns early, resolving by `(provider, uid)` alone. None of the above applies to them: `identity_id` is not their namespace.
 
-- `create_user` — creates a new user scoped to `backend.organisation`, passing `identity_id=uid` **only for `idproxy`**; an account created by any other backend has no `identity_id` and is reached through its `UserSocialAuth`.
-- `ensure_userid` — generates a slugified `userid` from first/last name if not already set. Deduplicates by appending a suffix.
+- `create_user` — creates a new user scoped to `backend.organisation`, passing `identity_id=uid` **only for `idproxy`**; an account created by any other backend has no `identity_id` and is reached through its `UserSocialAuth`. It takes every `SOCIAL_AUTH_USER_FIELDS` value the provider sent (names and `img_url` included) and generates the `userid` up front, so a new user is saved once — `user_details` then finds nothing to change. Values the provider left out (`None`) fall back to the model default.
+- `ensure_userid` — generates a slugified `userid` from first/last name for an existing user that has none. Deduplicates by appending a suffix.
 - `inherit_users` — maintains `identity_id` for `idproxy` only: it overwrites when the uid has changed, and `extra_identity_ids` in the response updates all same-org active users carrying those IDs to share the authenticated user's `identity_id`. Returns immediately for every other backend — see "`identity_id` belongs to the id proxy" below.
 - `bump_permissions` — if the identity server response includes `is_superuser: true`, grants `org_manager` role to the user.
 - `remove_nonmatching_email` — syncs the user's `email` field against the identity server's email scope data. Clears email if the scope is not present, but only when `idproxy` is the provider.

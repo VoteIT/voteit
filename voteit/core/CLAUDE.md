@@ -92,9 +92,11 @@ default cache is the developer's real redis, never cleared between tests.
 ```python
 some_registry = Registry(AbstractBase)
 
+
 @some_registry
 class MyConcrete(AbstractBase):
-    name = "my_key"   # used as registry key; falls back to __name__.lower()
+    name = "my_key"  # used as registry key; falls back to __name__.lower()
+
 
 @some_registry("explicit_key")
 class AnotherConcrete(AbstractBase): ...
@@ -121,18 +123,18 @@ Use the `@predicate` decorator (from `decorators.py`) rather than `@rules.predic
 ```python
 from voteit.core import PERM
 
-PERM.VIEW          # "view"
-PERM.ADD           # "add"
-PERM.CHANGE        # "change"
-PERM.DELETE        # "delete"
-PERM.MODERATE      # "moderate"
-PERM.HANDLE        # "handle"
+PERM.VIEW  # "view"
+PERM.ADD  # "add"
+PERM.CHANGE  # "change"
+PERM.DELETE  # "delete"
+PERM.MODERATE  # "moderate"
+PERM.HANDLE  # "handle"
 PERM.CHANGE_ROLES  # "change_roles"
-PERM.VIEW_ROLES    # "view_roles"
+PERM.VIEW_ROLES  # "view_roles"
 PERM.CHANGE_STATE  # "change_state"
-PERM.ARCHIVE       # "archive"
-PERM.MANAGE        # "manage"
-PERM.NOT_ALLOWED   # "__not_allowed"
+PERM.ARCHIVE  # "archive"
+PERM.MANAGE  # "manage"
+PERM.NOT_ALLOWED  # "__not_allowed"
 ```
 
 These are combined with model names by `RulesModelMixin.get_perm()` to produce full permission strings like `"meeting.moderate"`. Always reference `PERM.*` constants rather than raw strings.
@@ -193,6 +195,7 @@ Helper for ViewSets that need to look up a context object (e.g. a Meeting) from 
 ```python
 from voteit.core.rest_api.router import register
 
+
 @register("my-prefix", basename="my-base")
 class MyViewSet(ViewSet): ...
 ```
@@ -209,7 +212,7 @@ All ViewSets in the project register themselves here. The router is a `DefaultRo
 | `@ensure_atomic` | Assert that the decorated function is called within an active atomic block |
 | `@receiver_all_subclasses(signal, sender=Base)` | Connect a signal handler to all models that subclass `sender` |
 | `@has_exact_filter(*names)` | Assert that a Manager method's queryset has specific exact filters applied (guards against accidental cross-tenant queries) |
-| `@schedule_job(cron_string, ...)` | Schedule a function in the `long` RQ queue via `django-rq`'s scheduler |
+| `@schedule_job(cron_string, ...)` | Run a function on a cron schedule (UTC) in the `long` RQ queue. Only collects the job; `voteit/core/cron.py` hands them to `manage.py rqcron voteit.core.cron`, which must run as a single instance |
 | `@csrf_exempt_for_origins(get_origins)` | Skip CSRF for requests whose `Origin` (or `Referer`) is in `get_origins(request, *args, **kwargs)`; everyone else gets Django's usual check. Used for `social:begin`, see `voteit/organisation/views.py` |
 
 ## Signals (`signals.py`)
@@ -234,7 +237,7 @@ Four outgoing message types defined here:
 
 ## Background Jobs (`jobs.py`)
 
-`deactivate_unused_users` — runs weekly (Monday 04:35). Deactivates users who have not logged in for 30 days AND have no meeting or organisation roles; an account that never took part in anything is almost always a registration made by mistake.
+`deactivate_unused_users` — runs weekly (Monday 04:35 UTC). Deactivates users who have not logged in for 30 days AND have no meeting or organisation roles; an account that never took part in anything is almost always a registration made by mistake.
 
 The delete is the point, not incidental: the account is left deactivated, and `do_complete` refuses an inactive user.
 

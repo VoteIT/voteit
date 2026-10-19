@@ -6,7 +6,7 @@ load_dotenv()
 from .settings import *
 
 CSRF_TRUSTED_ORIGINS = ["http://localhost:3000", "http://voteit.localhost:3000"]
-CHANNEL_LAYERS["default"]["CONFIG"]["hosts"] = [("127.0.0.1", 6379)]
+CHANNEL_LAYERS["default"]["CONFIG"]["hosts"][0]["address"] = "redis://127.0.0.1:6379/0"
 DATABASES["default"]["HOST"] = "localhost"
 MEETING_DIALECTS_DIR = os.path.join(BASE_DIR, "src", "dialect_configs", "dialects")
 
@@ -15,8 +15,8 @@ for qname in {"default", "long"}:
     RQ_QUEUES[qname] = {"HOST": "localhost", "DB": 1, "PORT": 6379}
 
 
-if platform.system() == ("Darwin", "Windows"):
-    RQ = {"WORKER_CLASS": "rq.SimpleWorker"}
+if platform.system() in ("Windows",):
+    RQ["WORKER_CLASS"] = "rq.SimpleWorker"
 
 # Change this to debug PSA-backends!
 SOCIAL_AUTH_RAISE_EXCEPTIONS = False

@@ -41,6 +41,13 @@ elif [[ "$1" == "worker" ]]; then
   exec ./wait-for-it.sh db:5432 -s -- \
     ./wait-for-it.sh redis:6379 -s -- \
     ./manage.py rqworker --with-scheduler "${QUEUES[@]}"
+elif [[ "$1" == "cron" ]]; then
+  # Exactly one of these per deployment: rq's cron scheduler takes no lock,
+  # so a second instance enqueues every job twice.
+  echo "Starting cron scheduler"
+  exec ./wait-for-it.sh db:5432 -s -- \
+    ./wait-for-it.sh redis:6379 -s -- \
+    ./manage.py rqcron voteit.core.cron
 elif [[ "$1" == "shell" ]]; then
   exec ./manage.py shell "${@:2}"
 elif [[ "$1" == "manage" ]]; then

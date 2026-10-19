@@ -89,8 +89,8 @@ Outgoing only:
 
 ## Scheduled jobs (`jobs.py`)
 
-- `expire_unused_invites` (03:30 daily) — expires open invites where the meeting closed >30 days ago and the invite is >30 days old.
-- `cleanup_invites` (03:50 daily) — deletes expired/revoked invites >30 days old and all invites >200 days old.
+- `expire_unused_invites` (03:30 UTC daily) — expires open invites where the meeting closed >30 days ago and the invite is >30 days old.
+- `cleanup_invites` (03:50 UTC daily) — deletes expired/revoked invites >30 days old and all invites >200 days old.
 
 ## REST API
 

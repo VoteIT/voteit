@@ -30,7 +30,7 @@ Key fields:
 
 `jobs.py` — `populate_history_log`:
 
-- Scheduled via `@schedule_job("0 4 * * *")`, registered in `apps.py` `ready()`.
+- Scheduled via `@schedule_job("0 4 * * *")` (UTC), collected when `apps.py` `ready()` imports `jobs`.
 - Skips organisations that already have a log for the target date (idempotent).
 - Skips "uninteresting" days — no `LogEntry` and no `Connection` activity.
 - Date range filters use `mk_daterange_filter()` which produces `__gte` / `__lt` bounds on a datetime field (avoids slow `__date` lookups on unindexed columns).

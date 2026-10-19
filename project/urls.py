@@ -14,7 +14,6 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include(router.urls)),
     path("token-api/", include((token_router.urls, "token-api"))),
-    path("django-rq/", include("django_rq.urls")),
     # Shadows social:begin, so providers can post logins here
     path("login/<str:backend>/", begin),
     path("", include("social_django.urls")),
