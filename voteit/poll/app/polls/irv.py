@@ -1,3 +1,4 @@
+from contextlib import suppress
 from typing import Counter
 
 from django.utils.translation import gettext_lazy as _
@@ -5,11 +6,16 @@ from pydantic import field_validator, ConfigDict, BaseModel
 from pydantic import ValidationInfo
 from pydantic import PositiveInt
 from rest_framework.exceptions import ValidationError
-from stvpoll.abcs import STVPollBase
-from stvpoll.irv import IRV as IRVBase
+from stvpoll.base import get_ballots
+from stvpoll.base import get_votes
+from stvpoll.exceptions import CandidateDoesNotExist
 from stvpoll.exceptions import IncompleteResult
+from stvpoll.exceptions import STVException
 from stvpoll.irv import calculate_irv
 from stvpoll.irv import irv_quota
+from stvpoll.result import ElectionResult
+from stvpoll.types import BallotData
+from stvpoll.types import Candidates
 from stvpoll.types import SelectionMethod
 
 from voteit.poll.app.polls.scottish_stv import STVResultSchema
@@ -51,40 +57,43 @@ class IRV(ScottishSTV):
             )
 
 
-class RepeatedIRVPoll(STVPollBase):
+def calculate_repeated_irv(
+    candidates: Candidates,
+    ballots: BallotData,
+    winners: int,
+    *,
+    allow_random: bool = True,
+) -> ElectionResult:
     """
-    Repeats a regular IRVPoll to select multiple winners.
-    Heavily discouraged method!
+    Repeats IRV to select multiple winners. Heavily discouraged method!
+    Each round runs a full IRV among the remaining candidates, with the majority
+    quota based on all non-empty ballots. Rounds record first preference votes.
     """
+    if winners > len(candidates):
+        raise STVException("Not enough candidates to fill seats")
+    result = ElectionResult(candidates=candidates, seats=winners)
+    result.empty_ballot_count, ballots = get_ballots(ballots, candidates)
+    # get_ballots only checks the first preference of each ballot
+    if any(set(b).difference(candidates) for b in ballots):
+        raise CandidateDoesNotExist
+    quota = irv_quota(sum(b.count for b in ballots), winners)
+    first_preferences = get_votes(ballots, candidates, set(candidates))
 
-    def __init__(
-        self, seats: int, candidates, quota=irv_quota, random_in_tiebreaks=True
-    ):
-        self.random_in_tiebreaks = random_in_tiebreaks
-        super().__init__(seats, candidates, quota, random_in_tiebreaks)
-
-    def singular_quota(self, *args):
-        return irv_quota(sum(b.count for b in self.ballots), 0)
-
-    def calculate_round(self) -> None:
-        singular_irv = IRVBase(
-            candidates=self.standing_candidates,
-            quota=self.singular_quota,
-            random_in_tiebreaks=self.random_in_tiebreaks,
-        )
-        for ballot in self.ballots:
-            singular_irv.add_ballot(
-                [c for c in ballot if c in self.standing_candidates],
-                ballot.count,
+    with suppress(IncompleteResult):
+        while not result.complete:
+            standing = tuple(filter(result.still_standing, candidates))
+            singular_result = calculate_irv(
+                standing,
+                [([c for c in b if c in standing], b.count) for b in ballots],
+                allow_random=allow_random,
+                quota_method=lambda *_: quota,
             )
-        singular_irv.calculate()
-
-        if not singular_irv.result.complete:
-            raise IncompleteResult("No more candidates can get majority.")
-
-        elected = singular_irv.result[0]
-        winner = next(c for c in self.candidates if c == elected)
-        self.elect(winner, SelectionMethod.Direct)
+            if singular_result.randomized:
+                result.set_randomized()
+            if not singular_result.complete:
+                raise IncompleteResult("No more candidates can get majority.")
+            result.select(singular_result[0], first_preferences, SelectionMethod.Direct)
+    return result.finalize(quota=quota, tiebreakers=())
 
 
 class RepeatedIRVSettings(BaseModel):
@@ -162,14 +171,13 @@ class RepeatedIRV(ScottishSTV):
 
     def calculate_result(self, counter: Counter) -> STVResultSchema:
         settings = self.poll.settings
-        poll_counter = RepeatedIRVPoll(
-            seats=settings.winners,
-            candidates=self.candidates(),
-            random_in_tiebreaks=settings.allow_random,
+        result = calculate_repeated_irv(
+            self.candidates(),
+            self.ballots_from_counter(counter),
+            settings.winners,
+            allow_random=settings.allow_random,
         )
-        for ballot, count in self.ballots_from_counter(counter).items():
-            poll_counter.add_ballot(ballot, count)
-        return self.stv_result_from(poll_counter.calculate())
+        return self.stv_result_from(result)
 
     def start_check(self):
         prop_count = self.poll.proposals.count()
