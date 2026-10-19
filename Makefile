@@ -14,6 +14,8 @@ migrate:
 	python manage.py migrate
 rqworker:
 	python manage.py devrqworker default long --with-scheduler
+rqcron:
+	python manage.py rqcron voteit.core.cron
 # Development runs the same ASGI server as production (see docker-entrypoint.sh).
 # `manage.py runserver` is a plain WSGI dev server now that the daphne app is gone
 # from INSTALLED_APPS, so it answers REST but not /ws/. --reload-dir is not
@@ -27,6 +29,7 @@ DEV_UVICORN = DJANGO_SETTINGS_MODULE=project.settings_development PYTHONWARNINGS
 up:
 	docker compose up -d
 	python manage.py rqworker --with-scheduler default long &
+	python manage.py rqcron voteit.core.cron &
 	$(DEV_UVICORN)
 down:
 	docker compose down

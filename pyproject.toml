@@ -37,7 +37,6 @@ dependencies = [
     "nh3 (>=0.3.1,<0.4.0)",
     "social-auth-app-django<8.0.0",
     "django-sql-utils (>=0.7.0,<0.8.0)",
-    "rq-scheduler (>=0.14.0,<0.15.0)",
     "django-controlcenter>=0.3.3",
     "py-vote-core>=2.0.0",
     "python-magic>=0.4.27",

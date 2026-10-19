@@ -3,6 +3,9 @@
 ## 1.5.0 (unreleased)
 
 - **Dependency upgrades**: redis 8, django-rq 4, etc. Major django-rq upgrade that changed default commit mode!
+- **rq-scheduler replaced by rq's built-in cron**: `@schedule_job` only collects jobs now, and
+  `manage.py rqcron voteit.core.cron` (entrypoint `cron`) runs them. Run exactly one instance; it takes
+  no lock. Cron strings are now UTC, not Europe/Stockholm.
 - **Names changed locally are kept**: login no longer overwrites first/last name (#397).
 - **New users are saved once**, with `userid` set on create (#398).
 

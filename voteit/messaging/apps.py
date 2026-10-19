@@ -28,6 +28,6 @@ class MessagingConfig(AppConfig):
         from voteit.messaging.bundle import bind_bundle_schema
 
         bind_bundle_schema()
-        # Last: importing jobs runs @schedule_job, and jobs.py pulls in the
+        # Last: importing jobs collects its @schedule_job, and jobs.py pulls in the
         # message and channel registries it just populated.
         from voteit.messaging import jobs  # noqa: F401

@@ -28,7 +28,7 @@ The frontend is a separate single-page application that communicates with this b
 | Framework       | Django 5.2+, Django REST Framework         |
 | Database        | PostgreSQL (psycopg3)                      |
 | Real-time       | Django Channels 4, Redis                   |
-| Background jobs | RQ + RQ Scheduler                          |
+| Background jobs | RQ (worker + cron scheduler)               |
 | Auth            | Token auth, Session auth, OAuth2 (IDProxy) |
 | Permissions     | `django-rules` (object-level predicates)   |
 | State machines  | `python-statemachine`                      |
@@ -68,7 +68,7 @@ uv run python manage.py migrate
 #    (use the hostname you actually use, e.g. voteit.localhost)
 uv run python manage.py create_organisation localhost --superuser admin
 
-# 7. Start everything (Django dev server + RQ worker)
+# 7. Start everything (Django dev server + RQ worker + cron)
 make up
 ```
 
@@ -107,7 +107,7 @@ See [CLAUDE.md](CLAUDE.md) for a detailed architecture description including the
 ## Common commands
 
 ```bash
-make up            # Start docker services + RQ worker + dev server
+make up            # Start docker services + RQ worker + cron + dev server
 make down          # Stop docker services
 
 make test          # Run the full test suite (--keepdb --failfast)
@@ -118,6 +118,7 @@ make migrations    # makemigrations
 make migrate       # migrate
 
 make rqworker      # Start background worker only
+make rqcron        # Start the cron scheduler only (@schedule_job)
 ```
 
 All commands assume the virtualenv is active. If using `uv run`, prefix with `uv run` instead of activating.

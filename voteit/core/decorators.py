@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import threading
 from collections.abc import Callable
 from collections.abc import Collection
 from functools import wraps
@@ -8,14 +7,12 @@ from logging import getLogger
 from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
-import django_rq
 from django.apps import apps
 from django.db import IntegrityError
 from django.db.transaction import get_connection
 from django.db.transaction import on_commit
 from django.middleware.csrf import CsrfViewMiddleware
 from django.views.decorators.csrf import csrf_exempt
-from redis.exceptions import ConnectionError
 
 from voteit.core import RQ_LONG_QUEUE
 
@@ -185,125 +182,45 @@ def has_exact_filter(*names: str):
     return wrapper
 
 
-def redis_is_reachable(connection, timeout: float = 3) -> bool:
-    """
-    Check that a redis connection responds to PING within ``timeout`` seconds.
-
-    A plain ``connection.ping()`` can hang far longer than any configured socket
-    timeout when the host is unreachable (rather than just refusing the
-    connection), which is what makes test runs stall. Running the ping in a
-    daemon thread lets us give up after ``timeout`` seconds regardless of what
-    the underlying socket is doing.
-
-    >>> from fakeredis import FakeRedis
-    >>> redis_is_reachable(FakeRedis())
-    True
-
-    >>> class _Never:
-    ...     def ping(self):
-    ...         import time
-    ...         time.sleep(10)
-    >>> redis_is_reachable(_Never(), timeout=0.1)
-    False
-
-    >>> class _Broken:
-    ...     def ping(self):
-    ...         raise ConnectionError("nope")
-    >>> redis_is_reachable(_Broken(), timeout=0.1)
-    False
-    """
-    result = {}
-
-    def _ping():
-        try:
-            result["ok"] = connection.ping()
-        except Exception as exc:
-            result["error"] = exc
-
-    thread = threading.Thread(target=_ping, daemon=True)
-    thread.start()
-    thread.join(timeout)
-    if thread.is_alive():
-        logger.error(
-            "Timed out after %s seconds while checking redis connection", timeout
-        )
-        return False
-    if "error" in result:
-        logger.warning(
-            "Connection error from redis when checking connection: %s", result["error"]
-        )
-        return False
-    return True
-
-
-_reachable_cache: dict[tuple, bool] = {}
-
-
-def _cached_redis_is_reachable(connection, timeout: float = 3) -> bool:
-    """
-    Same as ``redis_is_reachable``, but memoised per (host, port, db) for the
-    life of the process. Several ``@schedule_job``-decorated functions
-    typically share the same redis config at startup, so this avoids spinning
-    up a check thread per job when one probe already answered the question.
-    """
-    kwargs = getattr(
-        getattr(connection, "connection_pool", None), "connection_kwargs", {}
-    )
-    cache_key = (kwargs.get("host"), kwargs.get("port"), kwargs.get("db"))
-    if cache_key not in _reachable_cache:
-        _reachable_cache[cache_key] = redis_is_reachable(connection, timeout=timeout)
-    return _reachable_cache[cache_key]
+# Filled at import time by @schedule_job, read by voteit.core.cron.
+scheduled_jobs: list[dict] = []
 
 
 def schedule_job(
-    cron_string: str,  # Cron string,
+    cron_string: str,
     *,
     queue_name: str = RQ_LONG_QUEUE,
     result_ttl=3600 * 24 * 7,
     ttl=600,
     timeout=600,
-    id: str = None,
-    **kwargs,
 ):
     """
+    Run the function on a cron schedule. Nothing touches redis here: the
+    `rqcron` process picks the job up via voteit.core.cron. Cron strings are
+    evaluated in UTC.
+
     Refresher on cron strings:
     minute (0-59)	hour (0 - 23)	day of the month (1 - 31)	month (1 - 12)	day of the week (0 - 6)
 
-
-    >>> from fakeredis import FakeRedis
-    >>> from unittest.mock import patch
-    >>> fakeredis = FakeRedis()
-    >>> with patch("django_rq.connection_utils.get_redis_connection", return_value=fakeredis):
-    ...     @schedule_job("1 1 * * 1-5")
-    ...     def foo():
-    ...         pass
-    ...
-    >>> scheduler = django_rq.get_scheduler('long', connection=fakeredis)
-    >>> scheduler.count()
-    1
-    >>> 'foo' in scheduler
-    True
+    >>> @schedule_job("1 1 * * 1-5")
+    ... def foo():
+    ...     pass
+    >>> entry = scheduled_jobs.pop()
+    >>> entry["func"] is foo, entry["cron"], entry["queue_name"]
+    (True, '1 1 * * 1-5', 'long')
     """
 
     def wrapper(f):
-        scheduler = django_rq.get_scheduler(queue_name)
-        if not _cached_redis_is_reachable(scheduler.connection):
-            logger.warning("Redis unreachable, skipping scheduling of %s", f)
-            return f
-        # FIXME: django_rqs wrapper of scheduler doesn't really respect the default values,
-        try:
-            scheduler.cron(
-                cron_string,
-                func=f,
-                id=id or f.__name__,
-                use_local_timezone=True,
-                result_ttl=result_ttl,
-                ttl=ttl,
-                timeout=timeout,
-                **kwargs,
-            )
-        except ConnectionError:
-            logger.warning("Connection error from redis when scheduling %s", f)
+        scheduled_jobs.append(
+            {
+                "func": f,
+                "cron": cron_string,
+                "queue_name": queue_name,
+                "result_ttl": result_ttl,
+                "ttl": ttl,
+                "job_timeout": timeout,
+            }
+        )
         return f
 
     return wrapper
