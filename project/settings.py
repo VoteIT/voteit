@@ -19,10 +19,6 @@ ALLOWED_HOSTS = [
     ".voteit.se",
     ".betahaus.net",
 ] + os.getenv("HOST", "").split()
-CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^https://[\w-]+\.voteit\.se$",
-    r"^https://[\w-]+\.betahaus\.net$",
-]
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 if not SECRET_KEY:
