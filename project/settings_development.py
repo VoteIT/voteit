@@ -16,7 +16,7 @@ for qname in {"default", "long"}:
 
 
 if platform.system() in ("Windows",):
-    RQ = {"WORKER_CLASS": "rq.SimpleWorker"}
+    RQ["WORKER_CLASS"] = "rq.SimpleWorker"
 
 # Change this to debug PSA-backends!
 SOCIAL_AUTH_RAISE_EXCEPTIONS = False

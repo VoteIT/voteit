@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.0 (unreleased)
+
+- **Dependency upgrades**: redis 8, django-rq 4, etc. Major django-rq upgrade that changed default commit mode!
+- **Names changed locally are kept**: login no longer overwrites first/last name (#397).
+- **New users are saved once**, with `userid` set on create (#398).
+
 ## 1.4.2 (2026-10-14)
 
 - **Bugfix** - `GET /api/organisation/` sets the `csrftoken` cookie. Nothing else

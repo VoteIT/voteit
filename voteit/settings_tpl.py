@@ -187,6 +187,8 @@ RQ_QUEUES = {
         "DEFAULT_RESULT_TTL": 3600 * 24 * 7,
     },
 }
+#: django-rq 4 defaults to "on_db_commit". Keep enqueueing immediately, as before.
+RQ = {"COMMIT_MODE": "auto"}
 
 # How long (seconds) to coalesce bursts of votes on the same poll before
 # broadcasting an updated PollStatus - see voteit.poll.jobs.
