@@ -8,6 +8,7 @@ from rest_framework.exceptions import ValidationError
 from stvpoll.abcs import STVPollBase
 from stvpoll.irv import IRV as IRVBase
 from stvpoll.exceptions import IncompleteResult
+from stvpoll.irv import calculate_irv
 from stvpoll.irv import irv_quota
 from stvpoll.types import SelectionMethod
 
@@ -35,12 +36,12 @@ class IRV(ScottishSTV):
     min_losers = 2
 
     def calculate_result(self, counter: Counter) -> STVResultSchema:
-        settings = self.poll.settings
-        poll_counter = IRVBase(
-            candidates=self.poll.proposals.all().values_list("id", flat=True),
-            random_in_tiebreaks=settings.allow_random,
+        result = calculate_irv(
+            self.candidates(),
+            self.ballots_from_counter(counter),
+            allow_random=self.poll.settings.allow_random,
         )
-        return self.finalize_stv_result(counter, poll_counter)
+        return self.stv_result_from(result)
 
     def start_check(self):
         if self.poll.proposals.count() < 3:
@@ -163,10 +164,12 @@ class RepeatedIRV(ScottishSTV):
         settings = self.poll.settings
         poll_counter = RepeatedIRVPoll(
             seats=settings.winners,
-            candidates=self.poll.proposals.all().values_list("id", flat=True),
+            candidates=self.candidates(),
             random_in_tiebreaks=settings.allow_random,
         )
-        return self.finalize_stv_result(counter, poll_counter)
+        for ballot, count in self.ballots_from_counter(counter).items():
+            poll_counter.add_ballot(ballot, count)
+        return self.stv_result_from(poll_counter.calculate())
 
     def start_check(self):
         prop_count = self.poll.proposals.count()

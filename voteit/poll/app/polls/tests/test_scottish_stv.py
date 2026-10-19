@@ -96,6 +96,16 @@ class ScottishTests(TestCase):
         self.assertEqual([one.pk, three.pk], result.approved)
         self.assertIsInstance(result.json(), str)
 
+    def test_result_with_empty_ballot(self):
+        self.poll.settings = {"winners": 1}
+        one = self.poll.proposals.create()
+        two = self.poll.proposals.create()
+        result = self.poll.method.calculate_result(
+            Counter({f"{one.pk},{two.pk}": 2, "": 3})
+        )
+        self.assertEqual([one.pk], result.approved)
+        self.assertEqual(3, result.empty_ballot_count)
+
     def test_close_without_votes(self):
         self.poll.state = "ongoing"
         self.poll.save()

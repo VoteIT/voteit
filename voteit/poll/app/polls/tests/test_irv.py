@@ -99,6 +99,16 @@ class IRVTests(TestCase):
         )
         self.assertIs(result.complete, False)
 
+    def test_result_with_empty_ballot(self):
+        one = self.poll.proposals.create()
+        two = self.poll.proposals.create()
+        self.poll.proposals.create()
+        result = self.poll.method.calculate_result(
+            Counter({f"{one.pk},{two.pk}": 2, str(two.pk): 1, "": 3})
+        )
+        self.assertEqual([one.pk], result.approved)
+        self.assertEqual(3, result.empty_ballot_count)
+
     def test_close_without_votes(self):
         self.poll.proposals.create()
         self.poll.proposals.create()
@@ -260,3 +270,12 @@ class RepeatedIRVTests(TestCase):
         self.assertEqual([self.prop_one.pk], result.approved)
         self.assertIsInstance(result.json(), str)
         self.assertIs(result.complete, False)
+
+    def test_result_with_empty_ballot(self):
+        counter = Counter()
+        counter[f"{self.prop_one.pk},{self.prop_two.pk}"] = 3
+        counter[f"{self.prop_two.pk},{self.prop_three.pk}"] = 2
+        counter[""] = 4
+        result = self.poll.method.calculate_result(counter)
+        self.assertEqual([self.prop_one.pk, self.prop_two.pk], result.approved)
+        self.assertEqual(4, result.empty_ballot_count)
