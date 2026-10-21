@@ -41,6 +41,10 @@ class ThingChanged(ObjectAddedOrChanged):
 `@outgoing` also generates `ThingChangedBatch` (`thing.changed.batch`) and
 registers both. There is no `*.added` — the client upserts on `*.changed`.
 
+Payloads carry no translated text -- send codes and let the client translate.
+The socket has no idea of the user's language, and a message published from a
+request is serialised once in that request's language for every recipient.
+
 Publish with `SomeChannel(pk).sync_publish(msg)`. Inside a transaction the send
 is deferred to commit, where `VOTEIT_BATCH_THRESHOLD` (3) or more of the same
 action to the same target collapse into one batch. Groups leave in the order
@@ -98,7 +102,7 @@ maintenance window reads as a wave of abnormal closures in the socket stats.
 ```python
 close_session_connections(request.session.session_key, code=LOGGED_OUT)
 close_user_connections(user.pk, code=LOGGED_OUT_EVERYWHERE, flush_session=True)
-close_all_connections(notice=Notice(...))      # manage.py close_sockets
+close_all_connections(notice=Notice(...))  # manage.py close_sockets
 ```
 
 **Do not send `s.close` through `publish()` or `send_to_consumer()`.** It is not
