@@ -156,6 +156,6 @@ class ScottishSTV(PollMethod):
             )
         if winners < self.min_winners:
             raise InvalidProposalCount(
-                _("The method %(method)s require at least %(min_winners)d winners")
+                _("The method %(method)s requires at least %(min_winners)d winners")
                 % {"method": self.title, "min_winners": self.min_winners}
             )

@@ -222,7 +222,7 @@ class RowColInvitesBaseSchema(BaseModel):
             msg = str(
                 _(
                     "You have rows that contain data that wouldn't be used since "
-                    "they have to many columns. Example on line %(line)s - with "
+                    "they have too many columns. Example on line %(line)s - with "
                     "tabs replaced:\n'%(example)s'\n"
                 )
                 % {

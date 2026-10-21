@@ -104,7 +104,7 @@ class InviteGroup(AnnotationDataAdapter):
         )
         if missing:
             raise ValueError(
-                _("The following groupids doesn't exist: %(groupids)s")
+                _("The following groupids don't exist: %(groupids)s")
                 % {"groupids": ",".join(missing)}
             )
 

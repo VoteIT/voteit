@@ -86,7 +86,7 @@ class PollStateMachine(StateChart, TransitionSignalMixin):
     )
     withhold_result = Event(
         finished.to(withheld, validators=["has_change_state_permission"]),
-        name=_("Withold detailed result"),
+        name=_("Withhold detailed result"),
     )
     cancel = Event(
         ongoing.to(canceled, validators=["has_change_state_permission"]),

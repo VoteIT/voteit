@@ -45,7 +45,7 @@ class IRV(ScottishSTV):
     def start_check(self):
         if self.poll.proposals.count() < 3:
             raise InvalidProposalCount(
-                _("The method %(method)s require at least 3 proposals")
+                _("The method %(method)s requires at least 3 proposals")
                 % {"method": self.title}
             )
 
@@ -172,7 +172,7 @@ class RepeatedIRV(ScottishSTV):
         prop_count = self.poll.proposals.count()
         if prop_count < 3:
             raise InvalidProposalCount(
-                _("The method %(method)s require at least 3 proposals")
+                _("The method %(method)s requires at least 3 proposals")
                 % {"method": self.title}
             )
         if self.poll.settings.min and self.poll.settings.min > prop_count:
