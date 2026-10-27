@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.1 (2026-10-27)
+
+- **Hello Denmark**,  localisation added.
+
 ## 1.5.0 (2026-10-20)
 
 - **Dependency upgrades**: redis 8, django-rq 4, etc. Major django-rq upgrade that changed default commit mode!
