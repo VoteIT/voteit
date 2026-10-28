@@ -76,7 +76,7 @@ Notable action behaviour:
 - `handle_speaker` — restricted fields: `body`, `open`, `show_time`, `send_sls`. Only the speaker-list moderator fields.
 - `mark_text` — relays a text selection (`start`, `end`, `proposal`) to `RoomChannel` subscribers via a `RoomMarked` WebSocket message. Nothing is persisted; validated by `RoomMarkTextSerializer` (start/end must both be set or both be `None`; `proposal` is required if start/end are given — same rules as the retired `RoomMarkTextSchema`-based WebSocket message).
 - `status` — preflight check returning `{"speakers": N, "speaker_lists": N}` to let the frontend warn before deleting a room with active speaker data.
-- `destroy` — deletes the associated `SpeakerListSystem` first (cascades speakers), then the room. Both happen inside a `durable=True` atomic block.
+- `destroy` — durable atomic delete; `SpeakerListSystem.room` cascades, taking the system, its lists and speakers with it.
 
 ### Serializers (`rest_api/serializers.py`)
 

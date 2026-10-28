@@ -8,7 +8,7 @@ Provides private per-user notes on proposals. Notes are personal and never visib
 
 Fields:
 - `proposal` — FK to `Proposal` (CASCADE); the subject of the note. Related name `"+"` (no reverse accessor).
-- `user` — FK to `AUTH_USER_MODEL` (RESTRICT); the note's owner. Related name `"notes"`.
+- `user` — FK to `AUTH_USER_MODEL` (CASCADE); the note's owner. Related name `"notes"`.
 - `meeting` — FK to `Meeting` (CASCADE); set automatically from `proposal.agenda_item.meeting` on first save. Never set directly.
 - `body` — `RichTextField` using `strict_clean_html` (HTML is sanitised on save).
 - `intent` — single-char choice field (`NoteIntent` enum in `__init__.py`): blank (`""`), approve (`"a"`), or deny (`"d"`).

@@ -591,7 +591,7 @@ class GroupMembership(RulesModelMixin, MeetingContext):
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.RESTRICT,
+        on_delete=models.CASCADE,
         related_name="+",
     )
     meeting_group: MeetingGroup = models.ForeignKey(

@@ -111,7 +111,7 @@ class SpeakerListSystem(
     room: Room = models.OneToOneField(
         Room,
         verbose_name="Room",
-        on_delete=models.RESTRICT,
+        on_delete=models.CASCADE,
         related_name="sls",
     )
     meeting: Meeting = models.ForeignKey(
