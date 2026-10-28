@@ -17,6 +17,7 @@ from asgiref.sync import sync_to_async
 from channels.layers import get_channel_layer
 from chanx.channels.testing import WebsocketTestCase
 from chanx.channels.utils import get_websocket_application
+from chanx.constants import CLOSE_UNAUTHENTICATED
 from django.db import transaction
 from django.conf import settings
 from django.test import override_settings
@@ -187,7 +188,7 @@ class ConsumerTestCase(WebsocketTestCase):
 class ConnectionTests(ConsumerTestCase):
     async def test_anonymous_is_closed(self):
         communicator = await self._connect()
-        await communicator.assert_closed()
+        await communicator.assert_closed(CLOSE_UNAUTHENTICATED)
 
     async def test_authenticated_gets_versions(self):
         communicator = await self._connect(self.moderator)
@@ -690,8 +691,8 @@ class CloseConnectionTests(ConsumerTestCase):
         return store.load()
 
     async def test_socket_is_closed_with_the_requested_code(self):
-        """assert_closed() is not used here -- it only matches a bare close
-        frame, and the whole point of s.close is the code it carries."""
+        """Compares the whole frame rather than assert_closed(code), which
+        would let extra keys through."""
         communicator = await self._connect(self.moderator)
         await sync_to_async(VoteitConsumer.broadcast_event_sync)(
             CloseConnection(payload={"code": 4001}), user_group(self.moderator.pk)

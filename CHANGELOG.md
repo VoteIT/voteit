@@ -4,6 +4,10 @@
 
 - **Presence check models dropped**: Electoral registers made from presence checks are kept, and the `presence_check` ER policy
   stays registered so old meetings still show it.
+- **Dependency upgrades**: certifi (critical CA fix), social-auth-core 6.2 / social-auth-app-django 7.2
+  (OAuth2 state and OIDC nonce bound to the session, single use, 30 min lifetime – logins in progress at
+  deploy must restart; brings migrations), chanx 2.12 (anonymous sockets close with 4401), python-dateutil 3.0.
+- **Nonces from abandoned logins** are removed by `cleanup_social_auth_leftovers` along with partials and codes.
 
 ## 1.5.1 (2026-10-27)
 

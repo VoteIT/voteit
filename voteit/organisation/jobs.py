@@ -10,6 +10,7 @@ from django.utils.timezone import now
 from django.utils.translation import gettext as _
 from django_rq import job
 from social_django.models import Code
+from social_django.models import Nonce
 from social_django.models import Partial
 from social_django.models import UserSocialAuth
 
@@ -50,17 +51,23 @@ def cleanup_social_auth_leftovers(**kwargs):
     A partial is the whole pipeline frozen mid-flight, so it carries the
     provider's response and the tokens in it. Abandoning one costs the person
     nothing: they log in again and are asked again.
+
+    Every login start stores a nonce for its OAuth2 state, removed when the
+    callback uses it, so abandoned logins leave one behind.
     """
     cutoff = now() - timedelta(days=SOCIAL_LEFTOVER_DAYS)
     partials, _ = Partial.objects.filter(timestamp__lt=cutoff).delete()
     codes, _ = Code.objects.filter(verified=False, timestamp__lt=cutoff).delete()
-    if partials or codes:
+    # Nonce.timestamp is a unix timestamp, not a datetime.
+    nonces, _ = Nonce.objects.filter(timestamp__lt=int(cutoff.timestamp())).delete()
+    if partials or codes or nonces:
         logger.info(
-            "cleanup_social_auth_leftovers: %d partial(s), %d unused code(s)",
+            "cleanup_social_auth_leftovers: %d partial(s), %d unused code(s), %d nonce(s)",
             partials,
             codes,
+            nonces,
         )
-    return partials + codes
+    return partials + codes + nonces
 
 
 @job(RQ_LONG_QUEUE)
