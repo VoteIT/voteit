@@ -41,7 +41,6 @@ if TYPE_CHECKING:
     from voteit.participant_tags.models import ParticipantTags
     from voteit.poll.abcs import ElectoralRegisterPolicy, VoteTransferPolicy
     from voteit.poll.models import ElectoralRegister, VoteTransfer
-    from voteit.presence.models import PresenceCheck
     from voteit.proposal.abcs import ProposalIDPolicy
     from voteit.proposal.models import Proposal
     from voteit.room.models import Room
@@ -375,7 +374,6 @@ class Meeting(
     agenda_items: models.QuerySet
     last_read_set: models.QuerySet
     pn_system: PNSystem | None
-    presence_checks: PresenceCheck.Manager
     polls: models.QuerySet
     reaction_buttons: models.QuerySet
     speaker_systems: models.QuerySet[SpeakerListSystem]

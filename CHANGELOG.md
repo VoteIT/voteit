@@ -1,8 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **Presence check models dropped**: Electoral registers made from presence checks are kept, and the `presence_check` ER policy
+  stays registered so old meetings still show it.
+
 ## 1.5.1 (2026-10-27)
 
-- **Hello Denmark**,  localisation added.
+- **Hello Denmark**, localisation added.
 
 ## 1.5.0 (2026-10-20)
 
