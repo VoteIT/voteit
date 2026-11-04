@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Dependency upgrades**: Mostly minor version bumps except python-dateutil that moved to 4.0.
+
 ## 1.6.0 (2026-11-04)
 
 - **Presence check models dropped**: Electoral registers made from presence checks are kept, and the `presence_check` ER policy
