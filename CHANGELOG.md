@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.6.0 (2026-11-04)
 
 - **Presence check models dropped**: Electoral registers made from presence checks are kept, and the `presence_check` ER policy
   stays registered so old meetings still show it.
