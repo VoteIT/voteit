@@ -119,6 +119,25 @@ class OnlineFilter(admin.SimpleListFilter):
                 )
 
 
+def _user_content_relations():
+    """
+    Reverse relations that make a user not clearable: meeting roles, anything
+    that would block a delete (votes, proposals, posts, speaker entries) and
+    anything they authored that a delete would orphan.
+    """
+    from voteit.meeting.models import MeetingRoles
+
+    for rel in User._meta.related_objects:
+        if rel.many_to_many:
+            continue
+        if (
+            rel.related_model is MeetingRoles
+            or rel.on_delete in (models.PROTECT, models.RESTRICT)
+            or rel.field.name == "author"
+        ):
+            yield rel
+
+
 class LinkedFilter(admin.SimpleListFilter):
     title = "ID-links"
 
@@ -174,9 +193,16 @@ class LinkedFilter(admin.SimpleListFilter):
             elif self.value() == self.DUPLICATES:
                 return queryset.filter(identity_id__in=self._dupes_qs())
             elif self.value() == self.MAYBE_CLEARABLE:
-                return queryset.filter(
-                    identity_id__in=self._dupes_qs(), meeting_roles__isnull=True
-                )
+                queryset = queryset.filter(identity_id__in=self._dupes_qs())
+                for rel in _user_content_relations():
+                    queryset = queryset.exclude(
+                        models.Exists(
+                            rel.related_model._base_manager.filter(
+                                **{rel.field.name: models.OuterRef("pk")}
+                            )
+                        )
+                    )
+                return queryset
             elif self.value() == self.SAME_PERSON:
                 return queryset.filter(pk__in=self._same_person_pks())
 

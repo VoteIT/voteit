@@ -105,6 +105,10 @@ close_user_connections(user.pk, code=LOGGED_OUT_EVERYWHERE, flush_session=True)
 close_all_connections(notice=Notice(...))  # manage.py close_sockets
 ```
 
+An anonymous socket is closed by chanx straight after connect with 4401
+(`chanx.constants.CLOSE_UNAUTHENTICATED`). It never gets a `Connection` row, so
+the code does not show up in the socket stats.
+
 **Do not send `s.close` through `publish()` or `send_to_consumer()`.** It is not
 registered with `@outgoing`, so with `VOTEIT_WS_FAST_FANOUT` on -- the default --
 `_send_now` takes the passthrough route, which forwards the raw frame to the

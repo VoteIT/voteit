@@ -158,9 +158,8 @@ class Reaction(RulesModelMixin, AgendaItemContext, MeetingContext):
     button: ReactionButton = models.ForeignKey(
         ReactionButton, on_delete=models.CASCADE, related_name="reactions"
     )
-    # Normally we don't want to delete user, but we should probably allow this later
     user: AbstractUser = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.RESTRICT
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE
     )
     agenda_item: AgendaItem = models.ForeignKey(
         "agenda.AgendaItem",

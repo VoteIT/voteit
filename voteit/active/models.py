@@ -30,7 +30,7 @@ class ActiveUser(RulesModelMixin, MeetingContext):
         related_name="active_users",
     )
     user: UserType = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.RESTRICT, related_name="+"
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+"
     )
     created: datetime = models.DateTimeField(editable=False, default=now)
 

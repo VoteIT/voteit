@@ -282,7 +282,7 @@ class MeetingInvite(RulesModelMixin, MeetingContext, StateMachineModelMixin):
     used_at: datetime = models.DateTimeField(null=True, blank=True)
     used_by: UserType = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.RESTRICT,
+        on_delete=models.SET_NULL,
         related_name="used_invites",
         null=True,
         blank=True,

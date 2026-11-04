@@ -7,9 +7,16 @@ from django.test import override_settings
 from django.urls import reverse
 from django.utils.timezone import now
 
+from voteit.agenda.models import AgendaItem
+from voteit.core.admin import LinkedFilter
 from voteit.core.admin import OnlineFilter
+from voteit.meeting.models import Meeting
 from voteit.messaging.models import Connection
+from voteit.messaging.testing import testing_channel_layers_setting
 from voteit.organisation.models import Organisation
+from voteit.poll.models import ElectoralRegister
+from voteit.poll.models import Poll
+from voteit.poll.models import Vote
 
 
 def get_all_admin_urls(admin_user):
@@ -123,3 +130,69 @@ class OnlineFilterTests(TestCase):
         # Silent for well over the default 15 minutes, but inside a 2h window.
         self._populate()
         self.assertEqual({"online", "silent"}, self._usernames(OnlineFilter.ONLINE))
+
+
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
+class LinkedFilterMaybeClearableTests(TestCase):
+    changelist_url = reverse("admin:core_user_changelist")
+
+    @classmethod
+    def setUpTestData(cls):
+        User = get_user_model()
+        cls.org = Organisation.objects.create(title="Org", host="org.example.com")
+        cls.meeting = Meeting.objects.create(organisation=cls.org)
+        cls.ai = AgendaItem.objects.create(meeting=cls.meeting)
+        cls.admin_user = User.objects.create_superuser(username="filter-admin")
+
+    def setUp(self):
+        super().setUp()
+        self.client.force_login(self.admin_user)
+
+    def _mk_dupe(self, username):
+        return get_user_model().objects.create(
+            username=username, organisation=self.org, identity_id="shared"
+        )
+
+    def _usernames(self):
+        response = self.client.get(
+            self.changelist_url, {"linked": LinkedFilter.MAYBE_CLEARABLE}
+        )
+        self.assertEqual(200, response.status_code)
+        return {obj.username for obj in response.context["cl"].result_list}
+
+    def test_blank_dupe_is_clearable(self):
+        self._mk_dupe("a")
+        self._mk_dupe("b")
+        get_user_model().objects.create(username="unlinked", organisation=self.org)
+        self.assertEqual({"a", "b"}, self._usernames())
+
+    def test_meeting_roles(self):
+        self._mk_dupe("a")
+        self.meeting.add_roles(self._mk_dupe("b"), "pa")
+        self.assertEqual({"a"}, self._usernames())
+
+    def test_proposal(self):
+        self._mk_dupe("a")
+        self.ai.proposals.create(author=self._mk_dupe("b"))
+        self.assertEqual({"a"}, self._usernames())
+
+    def test_discussion_post(self):
+        self._mk_dupe("a")
+        self.ai.discussions.create(author=self._mk_dupe("b"))
+        self.assertEqual({"a"}, self._usernames())
+
+    def test_vote(self):
+        er = ElectoralRegister.objects.create(meeting=self.meeting)
+        poll = Poll.objects.create(
+            method_name="simple", electoral_register=er, meeting=self.meeting
+        )
+        self._mk_dupe("a")
+        voter = self._mk_dupe("b")
+        er.set_voters_from_dict({voter.pk: 1})
+        Vote.objects.create(user=voter, poll=poll, abstain=True)
+        self.assertEqual({"a"}, self._usernames())
+
+    def test_authored_content(self):
+        self._mk_dupe("a")
+        Meeting.objects.create(organisation=self.org, author=self._mk_dupe("b"))
+        self.assertEqual({"a"}, self._usernames())
