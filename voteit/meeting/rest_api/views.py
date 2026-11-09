@@ -10,6 +10,7 @@ from django.db.models import QuerySet
 from django.db.models import RestrictedError
 from django.http import Http404
 from django.http import HttpResponse
+from django.utils.functional import cached_property
 from django_filters.rest_framework import DjangoFilterBackend
 from voteit.messaging.channels import user_group
 from voteit.messaging.consumer import VoteitConsumer
@@ -38,6 +39,7 @@ from voteit.meeting.models import MeetingGroup
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.rest_api import serializers
 from voteit.meeting.rest_api.filters import MeetingRolesFilter
+from voteit.meeting.utils import can_see_emails
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.utils import notify_dialect_changed
 
@@ -173,6 +175,20 @@ class MeetingRolesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
             context__participants=self.request.user
         ).prefetch_related("user")
 
+    @cached_property
+    def show_email(self) -> bool:
+        # The list filters on ?context=, add/remove post the meeting in the body.
+        pk = str(
+            self.request.query_params.get("context")
+            or self.request.data.get("meeting")
+            or ""
+        )
+        meeting = Meeting.objects.filter(pk=pk).first() if pk.isdigit() else None
+        return can_see_emails(self.request.user, meeting)
+
+    def get_serializer_context(self):
+        return {**super().get_serializer_context(), "show_email": self.show_email}
+
     @action(detail=False, methods=["get"], permission_classes=[])
     def available(self, request):
         return Response(
@@ -206,7 +222,11 @@ class MeetingRolesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
                 roles=changed,
             )
         roles_obj = MeetingRoles.objects.get(context=meeting, user=user)
-        return Response(serializers.MeetingRolesSerializer(roles_obj).data)
+        return Response(
+            serializers.MeetingRolesSerializer(
+                roles_obj, context=self.get_serializer_context()
+            ).data
+        )
 
     @action(
         detail=False,
@@ -240,7 +260,11 @@ class MeetingRolesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
             roles_obj = MeetingRoles.objects.get(context=meeting, user=user)
         except MeetingRoles.DoesNotExist:
             return Response(status=204)
-        return Response(serializers.MeetingRolesSerializer(roles_obj).data)
+        return Response(
+            serializers.MeetingRolesSerializer(
+                roles_obj, context=self.get_serializer_context()
+            ).data
+        )
 
 
 def _detach_group_if_safe(group: MeetingGroup) -> None:

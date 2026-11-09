@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth import login
 from django.contrib.auth import logout
 from django.contrib.messages import get_messages
+from django.utils.functional import cached_property
 from django.utils.translation import gettext as _
 from django.db import models
 from django.db import transaction
@@ -10,6 +11,7 @@ from rest_framework import mixins
 from rest_framework import permissions
 from rest_framework import viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import NotFound
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -37,6 +39,7 @@ from voteit.core.sessions import end_tracked_sessions
 from voteit.core.sessions import forget_session
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
+from voteit.meeting.utils import can_see_emails
 from voteit.messaging.close import close_session_connections
 from voteit.messaging.close import close_user_connections
 from voteit.messaging.models import LOGGED_OUT
@@ -59,9 +62,25 @@ class UserSearchViewSet(ModelContextMixin, viewsets.ReadOnlyModelViewSet):
         filters.SearchFilter,
     )
     filterset_fields = ("meeting",)
-    search_fields = "username", "email", "first_name", "last_name"
     context_queryset = Meeting.objects.all()
     context_lookup_kwarg = "meeting"
+
+    @cached_property
+    def show_email(self) -> bool:
+        try:
+            meeting = self.get_context(self.request)
+        except (ValidationError, NotFound):
+            meeting = None
+        return can_see_emails(self.request.user, meeting)
+
+    @property
+    def search_fields(self):
+        # Searching by email would leak it even with the field hidden.
+        fields = ("username", "first_name", "last_name")
+        return fields + ("email",) if self.show_email else fields
+
+    def get_serializer_context(self):
+        return {**super().get_serializer_context(), "show_email": self.show_email}
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -73,7 +92,8 @@ class UserSearchViewSet(ModelContextMixin, viewsets.ReadOnlyModelViewSet):
         User search as follows:
         - superuser: all (basically only during development)
         - org managers: organisation members
-        - moderators: all meeting participants
+        - meeting participants: all meeting participants, with email only
+          for moderators (see can_see_emails)
         """
         user = self.request.user
         if user.is_superuser or user.has_perm(

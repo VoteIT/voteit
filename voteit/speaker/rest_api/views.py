@@ -5,6 +5,7 @@ from django.db import models
 from django.db import transaction
 from django.http import Http404
 from django.http import HttpResponse
+from django.utils.functional import cached_property
 from django.utils.translation import gettext as _
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions
@@ -25,6 +26,7 @@ from voteit.core.rest_api import router
 from voteit.core.rest_api.mixins import StateMachineMixin
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.utils import can_see_emails
 from voteit.speaker.models import Speaker
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
@@ -165,6 +167,24 @@ class SpeakerSystemRolesViewSet(ListModelMixin, GenericViewSet):
             context__meeting__participants=self.request.user
         ).prefetch_related("user")
 
+    @cached_property
+    def show_email(self) -> bool:
+        # The list filters on ?context=, add/remove post the system in the body.
+        pk = str(
+            self.request.query_params.get("context")
+            or self.request.data.get("speaker_system")
+            or ""
+        )
+        system = (
+            SpeakerListSystem.objects.filter(pk=pk).select_related("meeting").first()
+            if pk.isdigit()
+            else None
+        )
+        return can_see_emails(self.request.user, system and system.meeting)
+
+    def get_serializer_context(self):
+        return {**super().get_serializer_context(), "show_email": self.show_email}
+
     @action(detail=False, methods=["get"], permission_classes=[])
     def available(self, request):
         return Response(
@@ -200,7 +220,11 @@ class SpeakerSystemRolesViewSet(ListModelMixin, GenericViewSet):
                 roles=changed,
             )
         roles_obj = SpeakerSystemRoles.objects.get(context=system, user=user)
-        return Response(serializers.SpeakerSystemRolesSerializer(roles_obj).data)
+        return Response(
+            serializers.SpeakerSystemRolesSerializer(
+                roles_obj, context=self.get_serializer_context()
+            ).data
+        )
 
     @action(
         detail=False,
@@ -231,7 +255,11 @@ class SpeakerSystemRolesViewSet(ListModelMixin, GenericViewSet):
             roles_obj = SpeakerSystemRoles.objects.get(context=system, user=user)
         except SpeakerSystemRoles.DoesNotExist:
             return Response(status=204)
-        return Response(serializers.SpeakerSystemRolesSerializer(roles_obj).data)
+        return Response(
+            serializers.SpeakerSystemRolesSerializer(
+                roles_obj, context=self.get_serializer_context()
+            ).data
+        )
 
 
 @router.register("speakers", basename="speakers")

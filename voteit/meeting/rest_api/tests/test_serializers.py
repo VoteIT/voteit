@@ -220,7 +220,7 @@ class MeetingRolesSerializerTests(TestCase):
 
     def test_moderator(self):
         instance = MeetingRoles.objects.get(pk=1)
-        serializer = self._cut(instance)
+        serializer = self._cut(instance, context={"show_email": True})
         data = serializer.data
         self.assertEqual({ROLE_PARTICIPANT, ROLE_MODERATOR}, set(data["assigned"]))
         self.assertEqual(
@@ -237,6 +237,10 @@ class MeetingRolesSerializerTests(TestCase):
         )
         self.assertEqual(1, data["meeting"])
         self.assertEqual(1, data["pk"])
+
+    def test_email_hidden_by_default(self):
+        data = self._cut(MeetingRoles.objects.get(pk=1)).data
+        self.assertNotIn("email", data["user"])
 
     def test_prefetch(self):
         qs = MeetingRoles.objects.prefetch_related("user")

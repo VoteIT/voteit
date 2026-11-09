@@ -1132,6 +1132,23 @@ class MeetingRolesViewSetTests(APITestCase):
         self.assertContains(response, "Jeff")
         self.assertEqual(len(response.json()), 1)
 
+    def test_participant_gets_no_emails(self):
+        self.user_jeff.email = "jeff@example.com"
+        self.user_jeff.save()
+        self.client.force_login(self.participant)
+        response = self.client.get(self.roles_url, {"context": self.meeting.pk})
+        self.assertEqual(200, response.status_code)
+        self.assertNotContains(response, "jeff@example.com")
+        self.assertTrue(all("email" not in x["user"] for x in response.json()))
+
+    def test_moderator_gets_emails(self):
+        self.user_jeff.email = "jeff@example.com"
+        self.user_jeff.save()
+        self.client.force_login(self.moderator)
+        response = self.client.get(self.roles_url, {"context": self.meeting.pk})
+        self.assertEqual(200, response.status_code)
+        self.assertContains(response, "jeff@example.com")
+
 
 class MeetingRolesChangeTests(APITestCase):
     fixtures = ["meeting_test_fixture"]
@@ -1167,6 +1184,14 @@ class MeetingRolesChangeTests(APITestCase):
         response = self.client.post(self.add_url, self._add_payload(), format="json")
         self.assertEqual(HTTPStatus.OK, response.status_code)
         self.assertIn(str(ROLE_DISCUSSER), response.json()["assigned"])
+
+    def test_add_moderator_gets_email(self):
+        self.participant.email = "participant@example.com"
+        self.participant.save()
+        self.client.force_login(self.moderator)
+        response = self.client.post(self.add_url, self._add_payload(), format="json")
+        self.assertEqual(HTTPStatus.OK, response.status_code)
+        self.assertEqual("participant@example.com", response.json()["user"]["email"])
 
     def test_add_org_manager(self):
         self.client.force_login(self.org_manager)
