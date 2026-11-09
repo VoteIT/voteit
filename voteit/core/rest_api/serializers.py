@@ -20,6 +20,7 @@ from statemachine.exceptions import TransitionNotAllowed
 from voteit.core import NOT_ALLOWED_SM_GUARD
 from voteit.core import PERM
 from voteit.core.abcs import MeetingContext
+from voteit.core.removal import get_user_from_abort_token
 from voteit.core.rest_api.utils import meeting_from_unsafe_data
 from voteit.core.rest_api.validators import SMEventValidator
 from voteit.core.utils import get_tagged_hashtags
@@ -286,6 +287,22 @@ class RequestRemovalSerializer(serializers.Serializer):
             "the request."
         ),
     )
+
+
+class AbortRemovalSerializer(serializers.Serializer):
+    token = serializers.CharField(help_text="The token from the removal email.")
+
+    def validate_token(self, value: str):
+        """Returns the user."""
+        user = get_user_from_abort_token(value)
+        if user is None:
+            raise ValidationError(
+                _(
+                    "This link is no longer valid. The removal may already "
+                    "have been aborted."
+                )
+            )
+        return user
 
 
 class UserConnectionSerializer(serializers.Serializer):

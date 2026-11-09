@@ -192,6 +192,10 @@ RQ = {"COMMIT_MODE": "auto"}
 # broadcasting an updated PollStatus - see voteit.poll.jobs.
 POLL_STATUS_THROTTLE_SECONDS = float(os.getenv("POLL_STATUS_THROTTLE_SECONDS", 1.5))
 
+# Minutes from a removal request until the email with the abort link is sent -
+# see voteit.core.removal.
+REMOVAL_EMAIL_DELAY_MINUTES = int(os.getenv("REMOVAL_EMAIL_DELAY_MINUTES", 10))
+
 # DRF
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [

@@ -4,6 +4,7 @@ from urllib.parse import urlencode
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.contrib.auth import login
+from django.contrib.auth import logout
 from django.utils.dateparse import parse_datetime
 from django.utils.timezone import is_aware
 from social_core.exceptions import AuthPolicyError
@@ -12,6 +13,7 @@ from django.utils.translation import gettext as _
 from social_django.models import UserSocialAuth
 
 from voteit.core.loggers import log_auth
+from voteit.core.removal import abort_removal_path
 from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation.matching import find_candidates
 from voteit.organisation.matching import is_elevated
@@ -344,6 +346,23 @@ def match_existing_user(
         if picked is not None:
             return {"user": picked, "matched_existing": True}
     return strategy.redirect(_link_account_url(strategy, current_partial.token))
+
+
+def stop_if_removal_requested(strategy, backend, user=None, *args, **kwargs):
+    """
+    An account marked for removal can't be logged in to. The person is sent to
+    the abort page instead, with the token -- being able to log in proves
+    ownership as well as the email does. Nothing resumes: once aborted, they log
+    in again.
+    """
+    if user is None or user.removal_requested is None:
+        return
+    # social_user may already have logged in an idproxy duplicate.
+    request = strategy.request
+    if request.user.is_authenticated and request.user.pk == user.pk:
+        logout(request)
+    logger.info("Login stopped for user %s: removal requested", user.pk)
+    return strategy.redirect(abort_removal_path(user))
 
 
 def create_user(strategy, details, backend, uid, user=None, *args, **kwargs):

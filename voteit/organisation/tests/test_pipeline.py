@@ -24,6 +24,7 @@ from voteit.organisation.pipeline import LINK_ACCOUNT_NEW
 from voteit.organisation.pipeline import match_existing_user
 from voteit.organisation.pipeline import require_connect_intent
 from voteit.organisation.pipeline import require_tos_accept
+from voteit.organisation.pipeline import stop_if_removal_requested
 from voteit.organisation.pipeline import store_tos_accept
 from voteit.organisation.pipeline import social_user
 from voteit.organisation.roles import ROLE_ORG_MANAGER
@@ -793,3 +794,37 @@ class StoreTosAcceptTests(TestCase):
     def test_nothing_accepted(self):
         store_tos_accept(user=self.user)
         self.assertFalse(UserAccept.objects.exists())
+
+
+class StopIfRemovalRequestedTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.org = Organisation.objects.create()
+        cls.user = cls.org.users.create(username="leaving", removal_requested=now())
+
+    def _strategy(self, request_user):
+        strategy = MagicMock()
+        strategy.request.user = request_user
+        return strategy
+
+    def test_no_user(self):
+        self.assertIsNone(stop_if_removal_requested(self._strategy(None), None))
+
+    def test_not_requested(self):
+        user = self.org.users.create(username="staying")
+        self.assertIsNone(stop_if_removal_requested(self._strategy(None), None, user))
+
+    @patch("voteit.organisation.pipeline.logout")
+    def test_redirects_to_abort_page(self, logout):
+        strategy = self._strategy(MagicMock(is_authenticated=False))
+        result = stop_if_removal_requested(strategy, None, self.user)
+        self.assertEqual(strategy.redirect.return_value, result)
+        self.assertIn("/abort-removal?token=", strategy.redirect.call_args.args[0])
+        logout.assert_not_called()
+
+    @patch("voteit.organisation.pipeline.logout")
+    def test_logs_out_if_already_logged_in(self, logout):
+        """social_user can log in an idproxy duplicate before this step."""
+        strategy = self._strategy(self.user)
+        stop_if_removal_requested(strategy, None, self.user)
+        logout.assert_called_once_with(strategy.request)

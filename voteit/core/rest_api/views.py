@@ -3,6 +3,7 @@ from django.contrib.auth import login
 from django.contrib.auth import logout
 from django.contrib.messages import get_messages
 from django.utils.functional import cached_property
+from django.utils.translation import get_language
 from django.utils.translation import gettext as _
 from django.db import models
 from django.db import transaction
@@ -28,6 +29,9 @@ from voteit.core.loggers import log_auth
 from voteit.core.rest_api import router
 from voteit.core.rest_api.filters import ActionAnnotatedDjangoFilterBackend
 from voteit.core.rest_api.mixins import ModelContextMixin
+from voteit.core.removal import cancel_removal_email
+from voteit.core.removal import schedule_removal_email
+from voteit.core.rest_api.serializers import AbortRemovalSerializer
 from voteit.core.rest_api.serializers import LogoutSerializer
 from voteit.core.rest_api.serializers import MessageSerializer
 from voteit.core.rest_api.serializers import ProviderSerializer
@@ -202,14 +206,33 @@ class UserView(
         serializer.is_valid(raise_exception=True)
         user = request.user
         if serializer.validated_data["request_removal"]:
-            # Asking again keeps the original time.
+            # Asking again keeps the original time, and doesn't send another email.
             if user.removal_requested is None:
                 user.removal_requested = now()
                 user.save(update_fields=["removal_requested"])
+                language = get_language()
+                transaction.on_commit(lambda: schedule_removal_email(user, language))
         elif user.removal_requested is not None:
-            user.removal_requested = None
-            user.save(update_fields=["removal_requested"])
+            _abort_removal(user)
         return Response(UserAndRolesSerializer(user, context={"request": request}).data)
+
+    @action(
+        methods=["POST"],
+        detail=False,
+        url_path="abort-removal",
+        serializer_class=AbortRemovalSerializer,
+        permission_classes=[AllowAny],
+    )
+    def abort_removal(self, request):
+        """
+        POST /api/user/abort-removal/ -- abort a removal request with the token
+        from the email. No login needed: whoever requested removal may be
+        using the owner's session.
+        """
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        _abort_removal(serializer.validated_data["token"])
+        return Response({"message": _("The removal of your account was aborted.")})
 
     @action(methods=["POST"], detail=True)
     @transaction.atomic(durable=True)
@@ -318,6 +341,12 @@ class UserView(
         messages = get_messages(request)
         serializer = self.get_serializer(messages, many=True)
         return Response(data=serializer.data)
+
+
+def _abort_removal(user) -> None:
+    user.removal_requested = None
+    user.save(update_fields=["removal_requested"])
+    transaction.on_commit(lambda: cancel_removal_email(user.pk))
 
 
 @router.register("health", basename="health")

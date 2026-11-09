@@ -86,6 +86,27 @@ so it does not leave a dead key behind.
 Tests that touch the cache must use `IsolatedCacheMixin` from `testing.py` — the
 default cache is the developer's real redis, never cleared between tests.
 
+## Removal requests (`removal.py`)
+
+`POST /api/user/request-removal/` sets `removal_requested` and, on commit, schedules an
+email `REMOVAL_EMAIL_DELAY_MINUTES` (default 10) later in the `long` queue (`enqueue_in`, job id `user-removal-email-<pk>`).
+The email is the guard against someone else requesting removal from the owner's
+unattended session, so it goes to the account's address with an abort link to the
+frontend (`ABORT_REMOVAL_URL`). It is written in the language active during the request.
+That page POSTs the token to `/api/user/abort-removal/` (AllowAny).
+
+The link is not a GET that aborts: mail scanners open links, and would silently abort
+genuine requests.
+
+The token is signed over the user pk and the `removal_requested` timestamp, so it dies when
+the request is withdrawn or made again. The job checks the same timestamp before sending.
+Cancelling the job on abort is therefore only tidiness, and a failed cancel can't send a
+stale email. Requesting again while a request stands keeps the original time and sends nothing.
+
+Logging in to an account with a pending request is stopped by the
+`stop_if_removal_requested` pipeline step, which redirects to the same abort page
+with a fresh token (`abort_removal_path`).
+
 ## Registry Pattern (`component.py`)
 
 `Registry(Dict[str, T])` is a typed dict that doubles as a decorator:

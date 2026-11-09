@@ -93,6 +93,7 @@ SOCIAL_AUTH_PIPELINE = [
     "voteit.organisation.pipeline.require_connect_intent",
     "voteit.organisation.pipeline.social_user",
     "voteit.organisation.pipeline.match_existing_user",
+    "voteit.organisation.pipeline.stop_if_removal_requested",
     # After the user is resolved, before one is created
     "voteit.organisation.pipeline.require_tos_accept",
     "social_core.pipeline.user.get_username",
@@ -129,6 +130,9 @@ LOGIN_ERROR_URL = "/error"
 LINK_ACCOUNT_URL = "/link-account"
 #: Where require_tos_accept sends someone who hasn't accepted the terms of service.
 ACCEPT_TOS_URL = "/accept-tos"
+#: Frontend page linked from the removal email, it POSTs the token to
+#: /api/user/abort-removal/.
+ABORT_REMOVAL_URL = "/abort-removal"
 
 # RQ
 REDIS_RQ_HOST = os.getenv("REDIS_RQ_HOST", "redis_rq")

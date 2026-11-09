@@ -11,6 +11,7 @@ from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 from social_core.exceptions import AuthException
 
+from voteit.core.removal import get_user_from_abort_token
 from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation.backends import IDProxyOAuth2
 from voteit.organisation.models import GlobalTermsOfService
@@ -180,6 +181,24 @@ class SocialIntegrationTests(APITestCase):
         self.assertEqual("Changed", user.first_name)
         # An empty one is still filled in
         self.assertEqual("with pass 'admin'", user.last_name)
+
+    @responses.activate
+    def test_complete_with_removal_requested_stops(self):
+        user = User.objects.create(
+            username="adminer",
+            organisation=self.organisation,
+            removal_requested=now(),
+        )
+        user.social_auth.create(uid="123", provider="idproxy", id_key="identity_id")
+        response = self._complete()
+        self.assertEqual(302, response.status_code)
+        location = response.get("Location")
+        self.assertTrue(location.startswith(settings.ABORT_REMOVAL_URL + "?"), location)
+        self.assertEqual(
+            user,
+            get_user_from_abort_token(parse_qs(location.split("?")[1])["token"][0]),
+        )
+        self.assertNotIn("_auth_user_id", self.client.session)
 
     @responses.activate
     def test_complete_new_user_must_accept_tos(self):

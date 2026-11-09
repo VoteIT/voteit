@@ -1,0 +1,17 @@
+{% extends "voteit/base_email.html" %}
+{% load i18n %}
+{% block body %}
+
+    <h2>{% blocktranslate %}Hi {{ full_name }}!{% endblocktranslate %}</h2>
+
+    <p>
+        {% blocktranslate %}Your account at {{ org_title }} has been marked for removal, as requested.{% endblocktranslate %}
+    </p>
+
+    <p>
+        {% translate "If this wasn't you, or if you've changed your mind, you can abort the removal here:" %}
+        <br>
+        <a href="{{ abort_url }}">{{ abort_url }}</a>
+    </p>
+
+{% endblock %}
