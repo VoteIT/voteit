@@ -214,12 +214,71 @@ class MeetingApiTokenViewSetTest(APITestCase):
         self.assertIn("key", data)
         self.assertNotEqual(data["prefix"], old_prefix)
 
-    def test_cycle_deletes_old_key(self):
-        obj, _ = self._create_key()
-        old_pk = obj.pk
+    def test_cycle_revokes_old_key(self):
+        obj, old_key = self._create_key()
         self.client.force_login(self.moderator)
         self.client.post(reverse("meeting-api-token-cycle", args=[obj.prefix]))
-        self.assertFalse(MeetingAPIKey.objects.filter(pk=old_pk).exists())
+        obj.refresh_from_db()
+        self.assertTrue(obj.revoked)
+        self.assertFalse(MeetingAPIKey.objects.is_valid(old_key))
+
+    def test_cycle_keeps_expiry_date(self):
+        obj, _ = self._create_key()
+        obj.expiry_date = timezone.now() + timedelta(days=10)
+        obj.save(update_fields=["expiry_date"])
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            reverse("meeting-api-token-cycle", args=[obj.prefix])
+        )
+        new_obj = MeetingAPIKey.objects.get(prefix=response.json()["prefix"])
+        self.assertEqual(new_obj.expiry_date, obj.expiry_date)
+
+    def test_cycle_sets_expiry_date_when_missing(self):
+        obj, _ = self._create_key()
+        self.assertIsNone(obj.expiry_date)
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            reverse("meeting-api-token-cycle", args=[obj.prefix])
+        )
+        new_obj = MeetingAPIKey.objects.get(prefix=response.json()["prefix"])
+        expected = timezone.now() + timedelta(days=120)
+        self.assertAlmostEqual(
+            new_obj.expiry_date, expected, delta=timedelta(minutes=1)
+        )
+
+    def test_cycle_revoked_key_rejected(self):
+        obj, _ = self._create_key()
+        obj.revoked = True
+        obj.save(update_fields=["revoked"])
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            reverse("meeting-api-token-cycle", args=[obj.prefix])
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(MeetingAPIKey.objects.count(), 1)
+
+    def test_cycle_expired_key_rejected(self):
+        obj, _ = self._create_key()
+        obj.expiry_date = timezone.now() - timedelta(days=1)
+        obj.save(update_fields=["expiry_date"])
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            reverse("meeting-api-token-cycle", args=[obj.prefix])
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(MeetingAPIKey.objects.count(), 1)
+
+    def test_cycle_does_not_increase_active_count(self):
+        keys = [self._create_key()[0] for _ in range(5)]
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            reverse("meeting-api-token-cycle", args=[keys[0].prefix])
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(
+            MeetingAPIKey.objects.filter(meeting=self.meeting, revoked=False).count(),
+            5,
+        )
 
     def test_cycle_creates_new_api_user(self):
         obj, _ = self._create_key()

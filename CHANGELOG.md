@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.6.1 (Unreleased)
+
+- **Bugfix** - Cycling a meeting API key only works on active keys (revoked or expired gives 400). The new key keeps
+  the old key's expiry date instead of never expiring, and the old key is revoked instead of deleted.
+
 ## 1.6.0 (2026-11-04)
 
 - **Presence check models dropped**: Electoral registers made from presence checks are kept, and the `presence_check` ER policy
@@ -94,7 +99,7 @@ the whole codebase to v1.
   should upsert. The 20 types that had both actions lose the `.added` one, and
   the four that only had `.added` (`er`, `vote`, `reaction`, `roles`) are
   renamed. 82 outgoing message types become 62.
-  Note `reaction.changed` and `roles.changed` are *deltas*, not object upserts,
+  Note `reaction.changed` and `roles.changed` are _deltas_, not object upserts,
   and keep their partner actions (`reaction.deleted`, `roles.removed`) — branch
   on the action pair rather than inferring intent from the name.
 - **Batch messages** Runs of the same message now collapse
@@ -115,7 +120,7 @@ the whole codebase to v1.
   new **`channel.state`** messages, then the new **`channel.state_complete`**.
 - **Initial state arrives bundled and named.** A `channel.state` payload is
   `{pk, channel_type, seq, sections}`; each section is `{name, complete,
-  failed, messages}`, where `name` identifies the server-side collector that
+failed, messages}`, where `name` identifies the server-side collector that
   produced it and `messages` holds ordinary outgoing messages verbatim. The
   names of every collector that will contribute are listed on
   `channel.subscribed` as `collectors`, so the client knows up front what to
@@ -159,9 +164,9 @@ the whole codebase to v1.
   sends an `s.msg` to everyone or to one
   organisation.
 - **Development runs uvicorn too** (`make run`, `make up`). `manage.py
-  runserver` no longer serves websockets: the `daphne` app is gone from
+runserver` no longer serves websockets: the `daphne` app is gone from
   `INSTALLED_APPS`, so runserver falls back to its WSGI handler. Daphne remains
-  a *dev* dependency because `channels.testing` imports it, and is no longer in
+  a _dev_ dependency because `channels.testing` imports it, and is no longer in
   the image.
 
 ### Changes
@@ -182,7 +187,7 @@ the whole codebase to v1.
   `ballot_checksum`, so a formatting change would have split identical ballots
   across two keys for any poll open across the upgrade.
 - `conlist(unique_items=True)` is replaced by an explicit validator that runs
-  *after* field coercion, so duplicates differing only in case or whitespace
+  _after_ field coercion, so duplicates differing only in case or whitespace
   are now correctly rejected on invite CSV upload.
 - `Connection` gains indexes; the equivalent lookup went from a 38ms sequential
   scan to 0.1ms on a table of ~860k rows.
@@ -211,7 +216,6 @@ the whole codebase to v1.
   at handshake, so nothing told the other tab its login was gone — it kept
   running with an identity that no longer existed. `POST /api/user/logout/` now
   closes the sockets belonging to that session.
-
 
 ## v0.47 (2026-08-17)
 
@@ -250,7 +254,7 @@ the release.
 
 ### Fixes
 
-- **`/invites/bulk-revoke/` contained a bug that caused server error.
+- \*\*`/invites/bulk-revoke/` contained a bug that caused server error.
 
 ## v0.46 (2026-06-18)
 
@@ -349,11 +353,11 @@ to regular rest interfaces in preparation of refactoring to ChanX.
 ### New features
 
 - **Token API**: New `voteit.token_api` app for programmatic access to meeting resources.
-API keys are scoped to a single meeting and carry per-resource permission scopes
-(`resource.action` or `resource.*`). Keys are issued via the admin or a moderator-only
-REST endpoint, expire after 120 days, and can be revoked.
-Includes views for invites and meeting info, rate limiting, and full auditlog attribution.
-See `voteit/token_api/README.md`. #374
+  API keys are scoped to a single meeting and carry per-resource permission scopes
+  (`resource.action` or `resource.*`). Keys are issued via the admin or a moderator-only
+  REST endpoint, expire after 120 days, and can be revoked.
+  Includes views for invites and meeting info, rate limiting, and full auditlog attribution.
+  See `voteit/token_api/README.md`. #374
 
 ### Changes
 
