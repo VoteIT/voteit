@@ -216,6 +216,22 @@ class ConnectionTests(ConsumerTestCase):
         self.assertIn(Pong(), messages)
         await communicator.disconnect()
 
+    async def test_invalid_frame_gets_problem_details(self):
+        # chanx's error frames are RFC 9457 problem details (CHANX ERROR_FORMAT
+        # "standard"); this catches a silent change of that shape.
+        communicator = await self._connect(self.moderator)
+        await self._quiet(communicator)
+        await communicator.send_json_to(
+            {"action": "channel.subscribe", "payload": {"pk": "nope"}}
+        )
+        frame = await communicator.receive_json_from(1)
+        self.assertEqual("error", frame["action"])
+        payload = frame["payload"]
+        self.assertEqual("https://chanx.dev/errors/validation-failed", payload["type"])
+        self.assertEqual({"type", "title", "detail", "errors"}, set(payload))
+        self.assertTrue(payload["errors"])
+        await communicator.disconnect()
+
     async def test_socket_survives_a_late_event_loop_wakeup(self):
         """A drain that times out must not take the socket down with it.
 
