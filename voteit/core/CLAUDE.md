@@ -59,6 +59,7 @@ All methods silently return an empty result for anonymous (unauthenticated) user
 - `identity_id` — opaque string used to link accounts across organisations (e.g. for SSO)
 - `img_url` — external profile image URL
 - `image` — uploaded profile image (stored at `org_{org_id}/images/{uuid}.{ext}`)
+- `removal_requested` — GDPR: when the user asked to be removed, or null. Set and cleared by the user via `POST /api/user/request-removal/` with `{"request_removal": bool}`
 
 `userid` uniqueness is enforced per organisation via a `UniqueConstraint`. The `UserIDValidator` restricts charset to `[a-z0-9-_]`.
 

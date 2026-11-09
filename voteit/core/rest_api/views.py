@@ -5,6 +5,7 @@ from django.contrib.messages import get_messages
 from django.utils.translation import gettext as _
 from django.db import models
 from django.db import transaction
+from django.utils.timezone import now
 from rest_framework import filters
 from rest_framework import mixins
 from rest_framework import permissions
@@ -28,6 +29,7 @@ from voteit.core.rest_api.mixins import ModelContextMixin
 from voteit.core.rest_api.serializers import LogoutSerializer
 from voteit.core.rest_api.serializers import MessageSerializer
 from voteit.core.rest_api.serializers import ProviderSerializer
+from voteit.core.rest_api.serializers import RequestRemovalSerializer
 from voteit.core.rest_api.serializers import StateMachineSchemaSerializer
 from voteit.core.rest_api.serializers import UserAndRolesSerializer
 from voteit.core.rest_api.serializers import UserConnectionSerializer
@@ -162,6 +164,32 @@ class UserView(
         elif session_key:
             close_session_connections(session_key, code=LOGGED_OUT)
         return Response()
+
+    @action(
+        methods=["POST"],
+        detail=False,
+        url_path="request-removal",
+        serializer_class=RequestRemovalSerializer,
+    )
+    def request_removal(self, request):
+        """
+        POST /api/user/request-removal/ -- ask for, or withdraw, removal of this account.
+
+        Responds with the user, where ``removal_requested`` holds the time of
+        the request or null.
+        """
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = request.user
+        if serializer.validated_data["request_removal"]:
+            # Asking again keeps the original time.
+            if user.removal_requested is None:
+                user.removal_requested = now()
+                user.save(update_fields=["removal_requested"])
+        elif user.removal_requested is not None:
+            user.removal_requested = None
+            user.save(update_fields=["removal_requested"])
+        return Response(UserAndRolesSerializer(user, context={"request": request}).data)
 
     @action(methods=["POST"], detail=True)
     @transaction.atomic(durable=True)

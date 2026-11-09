@@ -101,6 +101,8 @@ class User(AbstractUser):
         blank=True,
         null=True,
     )
+    # GDPR: when the user asked to have their data removed. Null means no request.
+    removal_requested: datetime | None = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         constraints = [

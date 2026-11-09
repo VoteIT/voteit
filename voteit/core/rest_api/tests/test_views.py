@@ -13,6 +13,7 @@ from django.test import RequestFactory
 from django.test import TestCase
 from django.test import override_settings
 from django.urls import reverse
+from django.utils.timezone import now
 from rest_framework.test import APITestCase
 from social_django.models import UserSocialAuth
 from statemachine import Event
@@ -261,6 +262,7 @@ class UserViewSetTests(IsolatedCacheMixin, APITestCase):
                 "login_provider": IDPROXY_PROVIDER,
                 # Only the requesting user's own
                 "member_ids": None,
+                "removal_requested": None,
             },
             data[0],
         )
@@ -289,6 +291,7 @@ class UserViewSetTests(IsolatedCacheMixin, APITestCase):
                 "email": "moderator@voteit.se",
                 "login_provider": IDPROXY_PROVIDER,
                 "member_ids": [],
+                "removal_requested": None,
             },
             data,
         )
@@ -420,6 +423,43 @@ class UserViewSetTests(IsolatedCacheMixin, APITestCase):
             self.client.post(reverse("user-logout"))
 
         self.assertIn("_auth_user_id", other.session)
+
+    def test_request_removal(self):
+        self.client.force_login(self.participant)
+        url = reverse("user-request-removal")
+        response = self.client.post(url, {"request_removal": True}, format="json")
+        self.assertEqual(200, response.status_code)
+        self.participant.refresh_from_db()
+        requested = self.participant.removal_requested
+        self.assertIsNotNone(requested)
+        self.assertIsNotNone(response.json()["removal_requested"])
+        # Asking again keeps the original time
+        self.client.post(url, {"request_removal": True}, format="json")
+        self.participant.refresh_from_db()
+        self.assertEqual(requested, self.participant.removal_requested)
+
+    def test_request_removal_withdrawn(self):
+        self.participant.removal_requested = now()
+        self.participant.save()
+        self.client.force_login(self.participant)
+        response = self.client.post(
+            reverse("user-request-removal"), {"request_removal": False}, format="json"
+        )
+        self.assertEqual(200, response.status_code)
+        self.assertIsNone(response.json()["removal_requested"])
+        self.participant.refresh_from_db()
+        self.assertIsNone(self.participant.removal_requested)
+
+    def test_request_removal_requires_value(self):
+        self.client.force_login(self.participant)
+        response = self.client.post(reverse("user-request-removal"), {}, format="json")
+        self.assertEqual(400, response.status_code)
+
+    def test_request_removal_anonymous(self):
+        response = self.client.post(
+            reverse("user-request-removal"), {"request_removal": True}, format="json"
+        )
+        self.assertEqual(401, response.status_code)
 
     def test_switching_user_does_not_leave_a_key_that_could_kill_the_new_session(self):
         """switch() re-points one session at another user, so the first user

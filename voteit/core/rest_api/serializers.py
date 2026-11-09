@@ -241,10 +241,12 @@ class UserAndRolesSerializer(UserSerializer):
         return sorted(get_user_member_ids(instance))
 
     class Meta(UserSerializer.Meta):
+        read_only_fields = UserSerializer.Meta.read_only_fields + ("removal_requested",)
         fields = UserSerializer.Meta.fields + (
             "organisation_roles",
             "login_provider",
             "member_ids",
+            "removal_requested",
         )
 
 
@@ -261,6 +263,15 @@ class LogoutSerializer(serializers.Serializer):
         help_text=(
             "Also end this user's other sessions, on every device, and close "
             "the websockets belonging to them."
+        ),
+    )
+
+
+class RequestRemovalSerializer(serializers.Serializer):
+    request_removal = serializers.BooleanField(
+        help_text=(
+            "Ask to have this account and its data removed. False withdraws "
+            "the request."
         ),
     )
 
