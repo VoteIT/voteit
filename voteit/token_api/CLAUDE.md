@@ -21,7 +21,8 @@ handles key hashing and prefix storage; VoteIT adds:
   `normalize_scopes` (e.g. `["invites.*", "invites.list"]` → `["invites.*"]`).
 - `last_used` — `DateTimeField`, updated at most once per minute to reduce write
   pressure (throttled by `LAST_USED_UPDATE_THRESHOLD = timedelta(minutes=1)`).
-- Keys expire 120 days after creation (set in the create view).
+- Keys expire 120 days after creation (set in the create view). A cycled key keeps
+  the expiry date of the key it replaces.
 
 ### `create_api_key_user(meeting)`
 
@@ -114,11 +115,13 @@ Registered on the **main** DRF router (not the token-API router) at
 | `retrieve` | GET `/{prefix}/` | Single key (never exposes the secret)              |
 | `create`   | POST           | Issue a new key; returns `key` field once only       |
 | `destroy`  | DELETE `/{prefix}/` | Revoke (sets `revoked=True`, does not delete)  |
-| `cycle`    | POST `/{prefix}/cycle/` | Replace key atomically; deletes old record |
+| `cycle`    | POST `/{prefix}/cycle/` | Revoke an active key and issue a replacement |
 | `scopes`   | GET `/scopes/` | All valid scope strings; no auth required            |
 
-Lookup is by `prefix` (not PK). `cycle` creates a fresh key with a new API user and
-hard-deletes the old record (unlike `destroy` which only revokes).
+Lookup is by `prefix` (not PK). `cycle` only accepts active keys (revoked or expired
+gives 400). It revokes the old record and creates a fresh key with a new API user, the
+same name, scopes and expiry date (or a new 120-day expiry if the old key had none),
+all in one transaction with the old row locked. The active key count stays the same, so the per-meeting limit holds.
 
 `MeetingApiTokenViewSet` uses `VerboseAutoPermissionViewSetMixin`. The `create`
 permission is set to `None` in `permission_type_map` because the meeting FK in the
@@ -192,7 +195,7 @@ request, `last_used` is updated only when it is unset or more than 1 minute old.
 The update uses `QuerySet.update()` (not `save()`) to skip signal overhead.
 
 **Revoke vs. cycle vs. delete.** `destroy` sets `revoked=True` and keeps the
-database record (for audit history). `cycle` hard-deletes the old record and issues a
+database record (for audit history). `cycle` also revokes (keeping the record) and issues a
 fresh key — appropriate when a key has been compromised and the operator wants to
 rotate credentials with zero gap.
 

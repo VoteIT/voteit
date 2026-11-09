@@ -128,6 +128,53 @@ class UserSearchViewSetTests(APITestCase):
         data = response.json()
         self.assertEqual(2, len(data))
 
+    def _set_emails(self):
+        for u in (self.participant, self.moderator, self.org_manager):
+            u.email = f"{u.username}@example.com"
+            u.save()
+
+    def test_participant_gets_no_emails(self):
+        self._set_emails()
+        self.client.force_login(self.participant)
+        response = self.client.get(
+            reverse("users-list"), data={"meeting": self.meeting.pk}
+        )
+        self.assertEqual(200, response.status_code)
+        data = response.json()
+        self.assertEqual(2, len(data))
+        self.assertTrue(all("email" not in x for x in data))
+
+    def test_participant_cant_search_by_email(self):
+        self._set_emails()
+        self.client.force_login(self.participant)
+        response = self.client.get(
+            reverse("users-list"),
+            data={"meeting": self.meeting.pk, "search": "moderator@example"},
+        )
+        self.assertEqual(200, response.status_code)
+        self.assertEqual([], response.json())
+
+    def test_moderator_gets_emails_and_can_search(self):
+        self._set_emails()
+        self.client.force_login(self.moderator)
+        url = reverse("users-list")
+        response = self.client.get(url, data={"meeting": self.meeting.pk})
+        self.assertEqual(
+            {"participant@example.com", "moderator@example.com"},
+            {x["email"] for x in response.json()},
+        )
+        response = self.client.get(
+            url, data={"meeting": self.meeting.pk, "search": "participant@example"}
+        )
+        self.assertEqual([self.participant.pk], [x["pk"] for x in response.json()])
+
+    def test_org_manager_gets_emails(self):
+        self._set_emails()
+        self.client.force_login(self.org_manager)
+        response = self.client.get(reverse("users-list"))
+        self.assertEqual(200, response.status_code)
+        self.assertTrue(all(x["email"] for x in response.json()))
+
     def test_update(self):
         self.client.force_login(self.superuser)
         url = reverse("users-detail", kwargs={"pk": self.superuser.pk})

@@ -148,6 +148,18 @@ class OptionalHyperlinkedIdentityField(serializers.HyperlinkedIdentityField):
 
 
 class UserListSerializer(serializers.ModelSerializer):
+    """
+    Drops ``email`` unless the context sets ``show_email`` -- participants can
+    list each other, but only moderators may read addresses. Nested use takes
+    the flag from the parent's context. See ``voteit.meeting.utils.can_see_emails``.
+    """
+
+    def get_fields(self):
+        fields = super().get_fields()
+        if not self.context.get("show_email"):
+            fields.pop("email", None)
+        return fields
+
     class Meta:
         model = get_user_model()
         fields = read_only_fields = (

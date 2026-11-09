@@ -3,8 +3,8 @@ from collections import Counter
 from django.utils.translation import gettext as _
 from pydantic import field_validator, ConfigDict
 from pydantic.main import BaseModel
-from stvpoll.abcs import STVPollBase
-from stvpoll.scottish_stv import ScottishSTV as _ScottishSTV
+from stvpoll.result import ElectionResult
+from stvpoll.scottish_stv import calculate_scottish_stv
 from rest_framework.exceptions import ValidationError
 
 from voteit.poll.abcs import PollMethod
@@ -113,13 +113,23 @@ class ScottishSTV(PollMethod):
             ranking = []
         return self.vote_schema(ranking=ranking)
 
-    def finalize_stv_result(
-        self, counter: Counter, poll_counter: STVPollBase
-    ) -> STVResultSchema:
-        for ballot, count in counter.items():
-            ballot_as_list = [int(r) for r in ballot.split(",")]
-            poll_counter.add_ballot(ballot_as_list, count)
-        result_dict = poll_counter.calculate().as_dict()
+    @staticmethod
+    def ballots_from_counter(counter: Counter) -> dict[tuple[int, ...], int]:
+        """
+        >>> ScottishSTV.ballots_from_counter(Counter({"1,3,2": 2, "": 1}))
+        {(1, 3, 2): 2, (): 1}
+        """
+        return {
+            tuple(int(r) for r in ballot.split(",")) if ballot else (): count
+            for ballot, count in counter.items()
+        }
+
+    def candidates(self) -> tuple[int, ...]:
+        return tuple(self.poll.proposals.all().values_list("id", flat=True))
+
+    @staticmethod
+    def stv_result_from(result: ElectionResult) -> STVResultSchema:
+        result_dict = result.as_dict()
         extra_kwargs = {"approved": result_dict["winners"]}
         if result_dict["complete"]:
             extra_kwargs["denied"] = set(result_dict["candidates"]).difference(
@@ -129,12 +139,13 @@ class ScottishSTV(PollMethod):
 
     def calculate_result(self, counter: Counter) -> STVResultSchema:
         settings = self.poll.settings
-        poll_counter = _ScottishSTV(
-            seats=settings.winners,
-            candidates=self.poll.proposals.all().values_list("id", flat=True),
-            random_in_tiebreaks=settings.allow_random,
+        result = calculate_scottish_stv(
+            self.candidates(),
+            self.ballots_from_counter(counter),
+            settings.winners,
+            allow_random=settings.allow_random,
         )
-        return self.finalize_stv_result(counter, poll_counter)
+        return self.stv_result_from(result)
 
     def validate_vote(self, vote: RankingSchema) -> None:
         if unmatched := self.unmatched_proposal_pks(vote.ranking):

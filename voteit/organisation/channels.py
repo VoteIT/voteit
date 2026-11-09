@@ -18,12 +18,18 @@ logger = getLogger(__name__)
 class OrganisationChannel(ContextChannel):
     """This is the generic organisation channel. Should be subscribed to for live updates of org roles.
     It also sends organisation object changes.
+
+    Only members may subscribe: it carries role changes, user.inv and admin notices.
     """
 
     name = "organisation"
     logger = logger
     model = Organisation
     permission = None
+
+    def allow_subscribe(self, user) -> bool:
+        # organisation_id is nullable, so guard None == None
+        return bool(user and user.organisation_id and user.organisation_id == self.pk)
 
 
 def broadcast_organisation(

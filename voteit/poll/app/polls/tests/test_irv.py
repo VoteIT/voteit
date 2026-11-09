@@ -3,6 +3,7 @@ from random import randint
 from random import sample
 
 from django.contrib.auth import get_user_model
+from django.test import SimpleTestCase
 from django.test import TestCase
 from pydantic import ValidationError
 from rest_framework.exceptions import ValidationError as DRFValidationError
@@ -98,6 +99,16 @@ class IRVTests(TestCase):
             }
         )
         self.assertIs(result.complete, False)
+
+    def test_result_with_empty_ballot(self):
+        one = self.poll.proposals.create()
+        two = self.poll.proposals.create()
+        self.poll.proposals.create()
+        result = self.poll.method.calculate_result(
+            Counter({f"{one.pk},{two.pk}": 2, str(two.pk): 1, "": 3})
+        )
+        self.assertEqual([one.pk], result.approved)
+        self.assertEqual(3, result.empty_ballot_count)
 
     def test_close_without_votes(self):
         self.poll.proposals.create()
@@ -260,3 +271,67 @@ class RepeatedIRVTests(TestCase):
         self.assertEqual([self.prop_one.pk], result.approved)
         self.assertIsInstance(result.json(), str)
         self.assertIs(result.complete, False)
+
+    def test_result_with_empty_ballot(self):
+        counter = Counter()
+        counter[f"{self.prop_one.pk},{self.prop_two.pk}"] = 3
+        counter[f"{self.prop_two.pk},{self.prop_three.pk}"] = 2
+        counter[""] = 4
+        result = self.poll.method.calculate_result(counter)
+        self.assertEqual([self.prop_one.pk, self.prop_two.pk], result.approved)
+        self.assertEqual(4, result.empty_ballot_count)
+
+
+class CalculateRepeatedIRVTests(SimpleTestCase):
+    def test_result(self):
+        from voteit.poll.app.polls.irv import calculate_repeated_irv
+
+        ballots = {(1, 2): 3, (2, 1): 3, (3, 1): 2, (1,): 1, (4, 3): 1}
+        result = calculate_repeated_irv((1, 2, 3, 4), ballots, 2, allow_random=False)
+        # Round 1: 4 and then 3 (history tiebreak with 2) excluded, 1 gets 6 votes.
+        # Round 2: 2 has 6 first preferences among 2, 3, 4.
+        self.assertEqual([1, 2], result)
+        self.assertIs(result.complete, True)
+        self.assertEqual(6, result.quota)
+        first_preferences = {1: 4.0, 2: 3.0, 3: 2.0, 4: 1.0}
+        self.assertEqual(
+            [
+                {
+                    "method": "Direct",
+                    "selected": (c,),
+                    "status": "Elected",
+                    "vote_count": first_preferences,
+                }
+                for c in (1, 2)
+            ],
+            [r.as_dict() for r in result.rounds],
+        )
+
+    def test_empty_ballots(self):
+        from voteit.poll.app.polls.irv import calculate_repeated_irv
+
+        result = calculate_repeated_irv(
+            (1, 2, 3), {(): 3, (1, 2): 2, (2,): 1}, 2, allow_random=False
+        )
+        self.assertEqual(3, result.empty_ballot_count)
+        self.assertEqual([1, 2], result)
+
+    def test_randomized(self):
+        from voteit.poll.app.polls.irv import calculate_repeated_irv
+
+        # 1 and 2 tie in the first round, so the winner order is random
+        ballots = {(1, 2): 2, (2, 1): 2, (3,): 3}
+        result = calculate_repeated_irv((1, 2, 3), ballots, 2)
+        self.assertEqual({1, 2}, set(result))
+        self.assertIs(result.randomized, True)
+        result = calculate_repeated_irv((1, 2, 3), ballots, 2, allow_random=False)
+        self.assertIs(result.complete, False)
+        self.assertIs(result.randomized, False)
+
+    def test_bad_candidate(self):
+        from stvpoll.exceptions import CandidateDoesNotExist
+
+        from voteit.poll.app.polls.irv import calculate_repeated_irv
+
+        with self.assertRaises(CandidateDoesNotExist):
+            calculate_repeated_irv((1, 2, 3), {(1, 4): 1}, 2)

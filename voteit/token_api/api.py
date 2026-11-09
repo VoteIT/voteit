@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 from django.db import models
+from django.db import transaction
 from django.utils import timezone
 from rest_framework import mixins
 from rest_framework import serializers
@@ -18,6 +19,11 @@ from voteit.token_api.models import create_api_key_user
 from voteit.token_api.validators import _valid_scopes_map
 
 MAX_ACTIVE_KEYS_PER_MEETING = 5
+KEY_LIFETIME = timedelta(days=120)
+
+
+def _new_expiry():
+    return timezone.now() + KEY_LIFETIME
 
 
 class MeetingAPIKeySerializer(serializers.ModelSerializer):
@@ -91,7 +97,7 @@ class MeetingApiTokenViewSet(
     | retrieve | Retrieve a single key by prefix                      |
     | create   | Create a new key — returns the plaintext key once    |
     | destroy  | Revoke a key (sets `revoked=true`, does not delete)  |
-    | cycle    | Replace a key with a new one, returns new plaintext  |
+    | cycle    | Revoke an active key and issue a replacement         |
     | scopes   | List all valid scope strings (no auth required)      |
 
     Keys expire 120 days after creation. Creating or cycling keys is blocked once
@@ -126,9 +132,8 @@ class MeetingApiTokenViewSet(
         serializer.is_valid(raise_exception=True)
         meeting = serializer.validated_data["meeting"]
         api_user = create_api_key_user(meeting)
-        expiry_date = timezone.now() + timedelta(days=120)
         obj, key = MeetingAPIKey.objects.create_key(
-            **serializer.validated_data, user=api_user, expiry_date=expiry_date
+            **serializer.validated_data, user=api_user, expiry_date=_new_expiry()
         )
         return Response({**self.get_serializer(obj).data, "key": key}, status=201)
 
@@ -148,12 +153,19 @@ class MeetingApiTokenViewSet(
     @action(methods=["POST"], detail=True)
     def cycle(self, request, prefix=None):
         instance = self.get_object()
-        api_user = create_api_key_user(instance.meeting)
-        obj, key = MeetingAPIKey.objects.create_key(
-            name=instance.name,
-            scopes=instance.scopes,
-            meeting=instance.meeting,
-            user=api_user,
-        )
-        MeetingAPIKey.objects.filter(pk=instance.pk).delete()
+        with transaction.atomic():
+            # Lock so parallel cycles of the same key can't both issue a new key
+            instance = MeetingAPIKey.objects.select_for_update().get(pk=instance.pk)
+            if instance.has_expired or instance.revoked:
+                raise serializers.ValidationError("Only active keys can be cycled.")
+            instance.revoked = True
+            instance.save(update_fields=["revoked"])
+            obj, key = MeetingAPIKey.objects.create_key(
+                name=instance.name,
+                scopes=instance.scopes,
+                meeting=instance.meeting,
+                user=create_api_key_user(instance.meeting),
+                # Keys from before expiry was enforced have none; give them one now
+                expiry_date=instance.expiry_date or _new_expiry(),
+            )
         return Response({**self.get_serializer(obj).data, "key": key}, status=201)

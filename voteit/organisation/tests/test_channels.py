@@ -7,9 +7,12 @@ organisation's group while connecting, so the group is the filter.
 
 from __future__ import annotations
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from voteit.core.messages.notice import Notice
+from voteit.messaging.jobs import build_subscription
+from voteit.messaging.messages import ChannelSubscribeError
 from voteit.messaging.testing import MessageCatcher
 from voteit.messaging.testing import ws_test_settings
 from voteit.organisation.channels import OrganisationChannel
@@ -77,3 +80,38 @@ class BroadcastOrganisationTests(TestCase):
             broadcast_organisation(self._notice(), self.one, on_commit=False)
         self.assertTrue(catcher.targets)
         self.assertTrue(all(target.group for target in catcher.targets))
+
+
+@ws_test_settings
+class OrganisationChannelPermissionTests(TestCase):
+    """Only members may subscribe to an organisation's channel."""
+
+    @classmethod
+    def setUpTestData(cls):
+        User = get_user_model()
+        cls.one = Organisation.objects.create(title="One", host="one.example.com")
+        cls.two = Organisation.objects.create(title="Two", host="two.example.com")
+        cls.member = User.objects.create(username="member", organisation=cls.one)
+        cls.outsider = User.objects.create(username="outsider", organisation=cls.two)
+        cls.orgless = User.objects.create(username="orgless")
+
+    def test_member_may_subscribe(self):
+        self.assertTrue(OrganisationChannel(self.one.pk).allow_subscribe(self.member))
+
+    def test_user_of_another_organisation_may_not(self):
+        self.assertFalse(
+            OrganisationChannel(self.one.pk).allow_subscribe(self.outsider)
+        )
+
+    def test_anonymous_may_not(self):
+        self.assertFalse(OrganisationChannel(self.one.pk).allow_subscribe(None))
+
+    def test_user_without_organisation_may_not(self):
+        """Guards organisation_id None == pk None."""
+        self.assertFalse(OrganisationChannel(None).allow_subscribe(self.orgless))
+
+    def test_subscribing_to_another_organisation_is_refused(self):
+        channel = OrganisationChannel(self.one.pk, consumer_channel="test")
+        messages = build_subscription(channel, self.outsider)
+        self.assertEqual(1, len(messages))
+        self.assertIsInstance(messages[0], ChannelSubscribeError)
