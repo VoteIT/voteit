@@ -25,7 +25,6 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db.transaction import get_connection
-from django.utils import translation
 from django.utils.timezone import now
 
 from voteit.core import RQ_DEFAULT_QUEUE
@@ -57,7 +56,7 @@ SUBSCRIBE_TIMEOUT = 20
 
 
 def enqueue_subscribe(
-    *, user_pk: int, consumer_channel: str, channel_type: str, pk: int, language: str
+    *, user_pk: int, consumer_channel: str, channel_type: str, pk: int
 ):
     return django_rq.get_queue(RQ_DEFAULT_QUEUE).enqueue(
         subscribe_job,
@@ -65,7 +64,6 @@ def enqueue_subscribe(
         consumer_channel=consumer_channel,
         channel_type=channel_type,
         pk=pk,
-        language=language,
         ttl=SUBSCRIBE_TTL,
         job_timeout=SUBSCRIBE_TIMEOUT,
     )
@@ -143,9 +141,7 @@ def _collect(collector, app_state: AppState) -> None:
             logger.exception("App state collector %r failed", collector.name)
 
 
-def build_subscription(
-    channel: ContextChannel, user, language: str | None = None
-) -> list[BaseMessage]:
+def build_subscription(channel: ContextChannel, user) -> list[BaseMessage]:
     """Check permission, join the group and build the whole subscribe stream.
 
     Returns channel.subscribed -- carrying the names of every collector that
@@ -164,57 +160,52 @@ def build_subscription(
         "channel_type": channel_cls.name,
         "channel_name": channel.channel_name,
     }
-    # override rather than activate: a thread from the pool is reused, so the
-    # language must not outlive the subscription that asked for it.
-    with translation.override(language or settings.LANGUAGE_CODE):
-        # durable=True so every collector sees one consistent snapshot,
-        # matching what envelope's DeferredJob.atomic did.
-        with transaction.atomic(durable=True):
-            try:
-                allowed = channel.allow_subscribe(user)
-            except ObjectDoesNotExist:
-                allowed = False
-            if not allowed:
-                return [
-                    ChannelSubscribeError(
-                        payload={
-                            "pk": channel.pk,
-                            "channel_type": channel_cls.name,
-                            "detail": "Not allowed to subscribe",
-                        }
-                    )
-                ]
-
-            async_to_sync(channel.subscribe)()
-
-            # Settled before anything is sent, so the client is told up front
-            # exactly which sections to expect and never waits on a collector
-            # that opted out. A list, not a generator: it is walked twice,
-            # once for the names below and once to run them.
-            collectors = [
-                collector
-                for collector in (
-                    cls(channel, user) for cls in collectors_for(channel_cls)
-                )
-                if _applicable(collector)
-            ]
-            messages: list[BaseMessage] = [
-                ChannelSubscribed(
-                    payload={**ref, "collectors": [c.name for c in collectors]}
+    # durable=True so every collector sees one consistent snapshot,
+    # matching what envelope's DeferredJob.atomic did.
+    with transaction.atomic(durable=True):
+        try:
+            allowed = channel.allow_subscribe(user)
+        except ObjectDoesNotExist:
+            allowed = False
+        if not allowed:
+            return [
+                ChannelSubscribeError(
+                    payload={
+                        "pk": channel.pk,
+                        "channel_type": channel_cls.name,
+                        "detail": "Not allowed to subscribe",
+                    }
                 )
             ]
 
-            app_state = AppState()
-            for collector in collectors:
-                _collect(collector, app_state)
+        async_to_sync(channel.subscribe)()
 
-            messages.extend(
-                iter_bundles(
-                    app_state.sections, pk=channel.pk, channel_type=channel_cls.name
-                )
+        # Settled before anything is sent, so the client is told up front
+        # exactly which sections to expect and never waits on a collector
+        # that opted out. A list, not a generator: it is walked twice,
+        # once for the names below and once to run them.
+        collectors = [
+            collector
+            for collector in (cls(channel, user) for cls in collectors_for(channel_cls))
+            if _applicable(collector)
+        ]
+        messages: list[BaseMessage] = [
+            ChannelSubscribed(
+                payload={**ref, "collectors": [c.name for c in collectors]}
             )
-            messages.append(ChannelStateComplete(payload=ref))
-            return messages
+        ]
+
+        app_state = AppState()
+        for collector in collectors:
+            _collect(collector, app_state)
+
+        messages.extend(
+            iter_bundles(
+                app_state.sections, pk=channel.pk, channel_type=channel_cls.name
+            )
+        )
+        messages.append(ChannelStateComplete(payload=ref))
+        return messages
 
 
 def subscribe_job(
@@ -223,14 +214,13 @@ def subscribe_job(
     consumer_channel: str,
     channel_type: str,
     pk: int,
-    language: str | None = None,
 ) -> None:
     """Build a subscription on the worker and stream it to one consumer."""
     channel = context_channel_registry[channel_type](
         pk, consumer_channel=consumer_channel
     )
     user = get_user_model().objects.filter(pk=user_pk).first()
-    for message in build_subscription(channel, user, language):
+    for message in build_subscription(channel, user):
         if isinstance(message, AppStateBundle):
             _send_state(message, consumer_channel)
         else:

@@ -33,7 +33,7 @@ class Note(MeetingContext):
     )
     user: UserType = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.RESTRICT,
+        on_delete=models.CASCADE,
         related_name="notes",
     )
     body: str = RichTextField(blank=True, default="", html_cleaner=strict_clean_html)

@@ -70,7 +70,7 @@ build:
 dev: build
 	docker build . -t voteit/voteit4dev:dev
 messages:
-	cd voteit && python ../manage.py makemessages  -l sv -i=.venv -i=src
+	cd voteit && python ../manage.py makemessages -l sv -l da -i=.venv -i=src
 compilemessages:
 	cd voteit && python ../manage.py compilemessages -i=.venv -i=src
 envtest:

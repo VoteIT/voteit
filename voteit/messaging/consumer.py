@@ -100,7 +100,6 @@ class SubscriptionMixin(ChanxWebsocketConsumerMixin):
             consumer_channel=self.channel_name,
             channel_type=ref.channel_type,
             pk=ref.pk,
-            language=self.scope.get("language") or settings.LANGUAGE_CODE,
         )
         # The worker sends channel.subscribed, the state, then state_complete.
         return None
@@ -370,11 +369,7 @@ class VoteitConsumer(
         # database_sync_to_async, not a loose thread: it runs on the one sync
         # thread the ORM is meant to be used from and hands the connection back
         # afterwards, the same way Channels' own database access does.
-        messages = await database_sync_to_async(build_subscription)(
-            channel,
-            self.user,
-            self.scope.get("language") or settings.LANGUAGE_CODE,
-        )
+        messages = await database_sync_to_async(build_subscription)(channel, self.user)
         for message in messages:
             if isinstance(message, ChannelSubscribed):
                 self.track_subscription(message.payload)

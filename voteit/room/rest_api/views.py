@@ -1,4 +1,3 @@
-from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.db import transaction
 from rest_framework.decorators import action
@@ -109,11 +108,6 @@ class RoomsViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
             }
         )
 
+    @transaction.atomic(durable=True)
     def perform_destroy(self, instance):
-        with transaction.atomic(durable=True):
-            try:
-                sls = instance.sls
-                sls.delete()
-            except ObjectDoesNotExist:
-                pass
-            instance.delete()
+        super().perform_destroy(instance)

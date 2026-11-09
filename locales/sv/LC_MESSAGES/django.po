@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-06 10:07+0200\n"
-"PO-Revision-Date: 2026-10-06 10:10+0200\n"
+"POT-Creation-Date: 2026-10-21 13:31+0200\n"
+"PO-Revision-Date: 2026-10-21 13:39+0200\n"
 "Last-Translator: Robin Harms Oredsson <robin@betahaus.net>\n"
 "Language-Team: \n"
 "Language: sv\n"
@@ -16,7 +16,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
-"X-Generator: Poedit 3.9\n"
+"X-Generator: Poedit 3.10\n"
 
 #: access_policy/app/policies/automatic.py:36
 msgid "Give users access automatically"
@@ -115,7 +115,7 @@ msgid ""
 "(post_as=False)"
 msgstr "Denna mötesgrupp tillåter inte att du postar som den (post_as=False)"
 
-#: core/rest_api/views.py:246
+#: core/rest_api/views.py:248
 msgid "You can't remove your only way of signing in."
 msgstr "Du kan inte ta bort ditt enda sätt att logga in."
 
@@ -127,19 +127,57 @@ msgstr "Hem"
 msgid "This email was sent from:"
 msgstr "Eposten skickades från:"
 
-#: core/validators.py:43 core/validators.py:55
+#: core/validators.py:44 core/validators.py:56
 msgid "Image upload is currently unavailable."
 msgstr "Det går för närvarande inte att ladda upp bilder."
 
-#: core/validators.py:47
+#: core/validators.py:48 core/validators.py:124
 #, python-format
 msgid "File too large. Max size: %s"
 msgstr "Filen är för stor. Maxstorlek: %s"
 
-#: core/validators.py:63
+#: core/validators.py:64
 #, python-format
 msgid "Unsupported file type, must be one of: %s."
 msgstr "Filtypen stöds inte. Det måste vara en av följande: %s."
+
+#: core/validators.py:133
+msgid "SVG must be UTF-8 encoded."
+msgstr "SVG-filen måste vara kodad i UTF-8."
+
+#: core/validators.py:136
+msgid "SVG must not contain a DOCTYPE or entities."
+msgstr "SVG-filen får inte innehålla DOCTYPE eller entiteter."
+
+#: core/validators.py:139
+msgid "SVG must not contain processing instructions."
+msgstr "SVG-filen får inte innehålla processinstruktioner."
+
+#: core/validators.py:149 core/validators.py:151 core/validators.py:156
+msgid "Not a valid SVG file."
+msgstr "Inte en giltig SVG-fil."
+
+#: core/validators.py:166 core/validators.py:175
+#, python-format
+msgid "SVG element not allowed: %s"
+msgstr "SVG-elementet är inte tillåtet: %s"
+
+#: core/validators.py:172
+msgid "SVG style must only contain text."
+msgstr "SVG-stilen får bara innehålla text."
+
+#: core/validators.py:180 core/validators.py:185
+#, python-format
+msgid "SVG attribute not allowed: %s"
+msgstr "SVG-attributet är inte tillåtet: %s"
+
+#: core/validators.py:187
+msgid "SVG may only link within the file."
+msgstr "SVG-filen får bara länka inom filen."
+
+#: core/validators.py:194
+msgid "SVG must not reference external resources."
+msgstr "SVG-filen får inte referera till externa resurser."
 
 #: export_import/rest_api/lock.py:4
 msgid "Import already in progress."
@@ -170,7 +208,7 @@ msgstr "GruppID"
 
 #: invites/app/invites/group.py:107
 #, python-format
-msgid "The following groupids doesn't exist: %(groupids)s"
+msgid "The following groupids don't exist: %(groupids)s"
 msgstr "Följande gruppID existerar inte: %(groupids)s"
 
 #: invites/app/invites/grouprole.py:34
@@ -356,7 +394,7 @@ msgstr ""
 #: invites/schemas.py:224
 #, python-format
 msgid ""
-"You have rows that contain data that wouldn't be used since they have to "
+"You have rows that contain data that wouldn't be used since they have too "
 "many columns. Example on line %(line)s - with tabs replaced:\n"
 "'%(example)s'\n"
 msgstr ""
@@ -454,11 +492,11 @@ msgstr "En ny inloggningsmetod har kopplats"
 msgid "A new login method was connected to your account"
 msgstr "En ny inloggningsmetod har kopplats till ditt konto"
 
-#: organisation/pipeline.py:34
+#: organisation/pipeline.py:46
 msgid "This organisation is no longer active."
 msgstr "Organisationen är inte längre aktiv."
 
-#: organisation/pipeline.py:212
+#: organisation/pipeline.py:230
 #, python-format
 msgid ""
 "This %(provider)s login already belongs to another account here. Sign in "
@@ -470,7 +508,7 @@ msgstr ""
 "till det här kontot istället måste du först ta bort %(provider)s från det "
 "andra kontot."
 
-#: organisation/pipeline.py:243
+#: organisation/pipeline.py:261
 msgid ""
 "You already have an account here that manages the organisation, but it has "
 "no way to sign in. Ask another organisation manager for help."
@@ -478,7 +516,7 @@ msgstr ""
 "Du har redan ett konto här som administrerar organisationen, men det saknar "
 "sätt att logga in. Be en annan organisationsadministratör om hjälp."
 
-#: organisation/pipeline.py:248
+#: organisation/pipeline.py:266
 #, python-format
 msgid ""
 "You already have an account here that manages the organisation. Sign in with "
@@ -487,19 +525,19 @@ msgstr ""
 "Du har redan ett konto här som administrerar organisationen. Logga in med "
 "%(existing)s i stället och koppla sedan %(new)s från din profil."
 
-#: organisation/rest_api/views.py:81
+#: organisation/rest_api/views.py:83
 msgid "You're logged in to another organisation"
 msgstr "Du är inloggad i en annan organisation"
 
-#: organisation/rest_api/views.py:200
+#: organisation/rest_api/views.py:204
 msgid "Newer terms of service have taken effect"
 msgstr "Nya användarvillkor har börjat gälla"
 
-#: organisation/rest_api/views.py:406
+#: organisation/rest_api/views.py:410
 msgid "Required"
 msgstr "Obligatoriskt"
 
-#: organisation/rest_api/views.py:410
+#: organisation/rest_api/views.py:414
 msgid "That question has already been answered."
 msgstr "Den frågan har redan besvarats."
 
@@ -698,7 +736,7 @@ msgstr "Instant-Runoff Voting"
 
 #: poll/app/polls/irv.py:48 poll/app/polls/irv.py:175
 #, python-format
-msgid "The method %(method)s require at least 3 proposals"
+msgid "The method %(method)s requires at least 3 proposals"
 msgstr "Metoden %(method)s kräver minst 3 förslag"
 
 #: poll/app/polls/irv.py:157
@@ -744,7 +782,7 @@ msgstr "Metoden %(method)s kan inte ha lika många vinnare som förslag"
 
 #: poll/app/polls/scottish_stv.py:159
 #, python-format
-msgid "The method %(method)s require at least %(min_winners)d winners"
+msgid "The method %(method)s requires at least %(min_winners)d winners"
 msgstr "Metoden %(method)s kräver minst %(min_winners)d vinnare"
 
 #: poll/app/polls/simple.py:44
@@ -810,7 +848,7 @@ msgid "Publish result"
 msgstr "Publicera resultat"
 
 #: poll/statemachines.py:89
-msgid "Withold detailed result"
+msgid "Withhold detailed result"
 msgstr "Dölj detaljerat resultat"
 
 #: poll/statemachines.py:93

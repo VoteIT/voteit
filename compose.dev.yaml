@@ -1,4 +1,4 @@
-# Link this file as compose.override.yml to use Docker for development
+# Link this file as compose.override.yaml to use Docker for development
 services:
   django:
     build:

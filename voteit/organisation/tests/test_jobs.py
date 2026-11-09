@@ -8,6 +8,7 @@ from django.test import override_settings
 from django.utils.timezone import now
 from voteit.messaging.testing import testing_channel_layers_setting
 from social_django.models import Code
+from social_django.models import Nonce
 from social_django.models import Partial
 from social_django.models import UserSocialAuth
 
@@ -166,3 +167,18 @@ class CleanupSocialAuthLeftoversTests(TestCase):
         Code.objects.filter(pk=code.pk).update(timestamp=now() - timedelta(days=2))
         cleanup_social_auth_leftovers()
         self.assertTrue(Code.objects.filter(pk=code.pk).exists())
+
+    def test_abandoned_login_nonces_go_too(self):
+        stale = Nonce.objects.create(
+            server_url="social_core.oauth2.scoutid",
+            timestamp=int((now() - timedelta(days=2)).timestamp()),
+            salt="stale",
+        )
+        fresh = Nonce.objects.create(
+            server_url="social_core.oauth2.scoutid",
+            timestamp=int(now().timestamp()),
+            salt="fresh",
+        )
+        self.assertEqual(1, cleanup_social_auth_leftovers())
+        self.assertFalse(Nonce.objects.filter(pk=stale.pk).exists())
+        self.assertTrue(Nonce.objects.filter(pk=fresh.pk).exists())

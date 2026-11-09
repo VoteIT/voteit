@@ -183,7 +183,7 @@ DATABASES = {
         "PASSWORD": os.getenv("POSTGRES_PASSWORD"),
         "HOST": os.getenv("POSTGRES_HOST", "db"),
         # Empty means the driver's default. The test targets in the Makefile
-        # point this at the db-test service in compose.yml.
+        # point this at the db-test service in compose.yaml.
         "PORT": os.getenv("POSTGRES_PORT", ""),
         "CONN_MAX_AGE": None if PGBOUNCER else 0,
         "CONN_HEALTH_CHECKS": True,
