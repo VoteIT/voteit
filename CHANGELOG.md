@@ -4,6 +4,8 @@
 
 - **Bugfix** - Cycling a meeting API key only works on active keys (revoked or expired gives 400). The new key keeps
   the old key's expiry date instead of never expiring, and the old key is revoked instead of deleted.
+- **Security** - Users can only subscribe to their own organisation's websocket channel. Before, any logged-in user
+  could subscribe to another organisation's channel and receive its role changes, user updates and notices.
 
 ## 1.6.0 (2026-11-04)
 

@@ -225,7 +225,7 @@ Users may change their names locally (`UpdateUserSerializer`), so `SOCIAL_AUTH_I
 
 ## WebSocket Channel (`channels.py`)
 
-`OrganisationChannel` is a `ContextChannel` keyed by `Organisation` pk. Has `permission = None` (no explicit subscribe permission; any authenticated user can subscribe).
+`OrganisationChannel` is a `ContextChannel` keyed by `Organisation` pk. `allow_subscribe` only admits members (`user.organisation_id == pk`); `permission` is unused.
 
 The client never subscribes to it: the consumer does it on connect, for the organisation the user belongs to (`VoteitConsumer.subscribe_to_organisation`). The stream is the ordinary one, built inline rather than on a worker because the channel is small.
 
