@@ -1,7 +1,9 @@
 # Changelog
 
-## 1.6.1 (Unreleased)
+## 1.6.2 (2026-11-09)
 
+- **Bugfix** - Repeated IRV results are marked randomized when a random tiebreak decided any round.
+  Scottish STV and IRV now use stvpoll's calculate functions.
 - **Bugfix** - Cycling a meeting API key only works on active keys (revoked or expired gives 400). The new key keeps
   the old key's expiry date instead of never expiring, and the old key is revoked instead of deleted.
 - **Security** - Users can only subscribe to their own organisation's websocket channel. Before, any logged-in user
@@ -9,6 +11,10 @@
 - **Security** - Meeting participants no longer see each other's email addresses. User lists from `/api/users/`,
   `/api/meeting-roles/` and `/api/speaker-system-roles/` only include email for moderators, org managers and
   superusers, and only they can search users by email.
+
+## 1.6.1 (2026-11-09)
+
+- **Dependency upgrades**
 
 ## 1.6.0 (2026-11-04)
 
