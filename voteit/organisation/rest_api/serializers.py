@@ -4,9 +4,11 @@ from typing import List
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.timezone import now
+from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
 from voteit.components.rest_api.serializers import OrganisationComponentSerializer
+from voteit.core.removal import POSTPONE_KINDS
 from voteit.core.rest_api.fields import SameOrgUserField
 from voteit.core.rest_api.serializers import UserSerializer
 from voteit.core.rest_api.validators import RoleValidator
@@ -280,6 +282,16 @@ class MeetingInvolvementSerializer(serializers.Serializer):
     reactions = serializers.IntegerField()
 
 
+class PostponeRemovalSerializer(serializers.Serializer):
+    kind = serializers.ChoiceField(choices=POSTPONE_KINDS)
+    until = serializers.DateTimeField()
+
+    def validate_until(self, value):
+        if value <= now():
+            raise serializers.ValidationError(_("Must be in the future."))
+        return value
+
+
 class RemovalRequestSerializer(serializers.Serializer):
     """Serializes a ``voteit.core.removal.RemovalReport``."""
 
@@ -295,6 +307,11 @@ class RemovalRequestSerializer(serializers.Serializer):
         )
     )
     meetings = MeetingInvolvementSerializer(many=True)
+    postponed = PostponeRemovalSerializer(
+        allow_null=True,
+        help_text="Set by a manager. Both kinds stop reminders, block also means "
+        "don't remove yet -- removing still works.",
+    )
 
     def get_can_remove(self, report) -> bool:
         """The wait has passed, and it isn't the manager themselves."""

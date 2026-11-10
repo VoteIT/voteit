@@ -22,6 +22,7 @@ import django_rq
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core import signing
+from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.mail import send_mail
 from django.db import transaction
@@ -30,6 +31,7 @@ from django.db.models import RestrictedError
 from django.template import loader
 from django.utils import translation
 from django.utils.html import strip_tags
+from django.utils.timezone import now
 from django.utils.translation import gettext as _
 from redis.exceptions import ConnectionError
 from redis.exceptions import TimeoutError
@@ -188,6 +190,39 @@ def _delete_user(user) -> bool:
     return True
 
 
+#: Postpone kinds. Both keep the user out of the managers' reminders, block also
+#: tells managers not to remove yet -- advisory, removal still works.
+POSTPONE_BLOCK = "block"
+POSTPONE_REMIND = "remind"
+POSTPONE_KINDS = (POSTPONE_BLOCK, POSTPONE_REMIND)
+
+
+def _postpone_key(user_pk: int) -> str:
+    return f"removal-postpone-{user_pk}"
+
+
+def postpone_removal(user_pk: int, kind: str, until: datetime) -> None:
+    """Kept in the cache, so losing it only means reminders come back early."""
+    assert kind in POSTPONE_KINDS
+    timeout = (until - now()).total_seconds()
+    if timeout <= 0:
+        clear_postponed_removal(user_pk)
+        return
+    cache.set(_postpone_key(user_pk), {"kind": kind, "until": until}, timeout)
+
+
+def clear_postponed_removal(user_pk: int) -> None:
+    cache.delete(_postpone_key(user_pk))
+
+
+def get_postponed_removals(user_pks) -> dict[int, dict]:
+    """``{user_pk: {"kind": ..., "until": ...}}`` for those postponed."""
+    keys = {_postpone_key(pk): pk for pk in user_pks}
+    if not keys:
+        return {}
+    return {keys[key]: value for key, value in cache.get_many(keys).items()}
+
+
 DELETED = "deleted"
 ANONYMISED = "anonymised"
 
@@ -274,6 +309,7 @@ class RemovalReport:
     organisation_roles: list[str]
     meetings: list[MeetingInvolvement]
     classification: str
+    postponed: dict | None = None
 
 
 def removable_after(user) -> datetime:
@@ -319,6 +355,7 @@ def get_removal_reports(users) -> list[RemovalReport]:
     if not users:
         return []
     user_pks = {user.pk for user in users}
+    postponed = get_postponed_removals(user_pks)
 
     org_roles = {
         user_pk: list(assigned)
@@ -457,6 +494,7 @@ def get_removal_reports(users) -> list[RemovalReport]:
                 organisation_roles=user_org_roles,
                 meetings=involvements,
                 classification=classification,
+                postponed=postponed.get(user.pk),
             )
         )
     return reports

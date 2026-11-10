@@ -29,8 +29,10 @@ from voteit.core import PERM
 from voteit.core.loggers import log_roles_change
 from voteit.core.loggers import notification_logger
 from voteit.core.loggers import log_auth
+from voteit.core.removal import clear_postponed_removal
 from voteit.core.removal import get_removal_report
 from voteit.core.removal import get_removal_reports
+from voteit.core.removal import postpone_removal
 from voteit.core.removal import removable_after
 from voteit.core.removal import remove_user
 from voteit.core.rest_api import router
@@ -511,3 +513,28 @@ class RemovalRequestsViewSet(viewsets.GenericViewSet):
             log_auth("Removed user on request", request=request, for_user=user.pk)
             result = remove_user(user, user.organisation.get_language())
         return Response({"result": result})
+
+    @action(
+        methods=["POST", "DELETE"],
+        detail=True,
+        serializer_class=serializers.PostponeRemovalSerializer,
+    )
+    def postpone(self, request, pk=None):
+        """
+        POST /api/removal-requests/<pk>/postpone/ with ``{"kind": "block" |
+        "remind", "until": ...}`` replaces any earlier postpone, DELETE clears it.
+        Responds with the report.
+        """
+        user = get_object_or_404(self.get_queryset(), pk=pk)
+        if request.method == "DELETE":
+            clear_postponed_removal(user.pk)
+        else:
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            postpone_removal(user.pk, **serializer.validated_data)
+        report = get_removal_report(user)
+        return Response(
+            serializers.RemovalRequestSerializer(
+                report, context=self.get_serializer_context()
+            ).data
+        )

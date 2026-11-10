@@ -10,13 +10,15 @@ from django.urls import reverse
 from django.utils.timezone import now
 from rest_framework.test import APITestCase
 
+from voteit.core.removal import postpone_removal
+from voteit.core.testing import IsolatedCacheMixin
 from voteit.organisation.models import Organisation
 
 User = get_user_model()
 
 
 @override_settings(REMOVAL_WAIT_HOURS=3)
-class RemovalRequestsTests(APITestCase):
+class RemovalRequestsTests(IsolatedCacheMixin, APITestCase):
     fixtures = ["meeting_test_fixture"]
 
     @classmethod
@@ -192,3 +194,62 @@ class RemovalRequestsTests(APITestCase):
     def test_remove_not_manager(self):
         self.client.force_login(self.moderator)
         self.assertEqual(403, self._remove(self.participant).status_code)
+
+    def _postpone_url(self, user):
+        return reverse("removal-requests-postpone", kwargs={"pk": user.pk})
+
+    def test_postpone(self):
+        self.client.force_login(self.org_manager)
+        until = now() + timedelta(days=2)
+        response = self.client.post(
+            self._postpone_url(self.participant),
+            {"kind": "block", "until": until.isoformat()},
+            format="json",
+        )
+        self.assertEqual(200, response.status_code)
+        self.assertEqual("block", response.json()["postponed"]["kind"])
+        response = self.client.get(reverse("removal-requests-list"))
+        participant, moderator = response.json()
+        self.assertEqual("block", participant["postponed"]["kind"])
+        self.assertIsNone(moderator["postponed"])
+        # Advisory only
+        self.assertTrue(participant["can_remove"])
+        self.assertEqual(200, self._remove(self.participant).status_code)
+
+    def test_postpone_replaces_and_clears(self):
+        postpone_removal(self.participant.pk, "block", now() + timedelta(days=1))
+        self.client.force_login(self.org_manager)
+        url = self._postpone_url(self.participant)
+        response = self.client.post(
+            url,
+            {"kind": "remind", "until": (now() + timedelta(days=1)).isoformat()},
+            format="json",
+        )
+        self.assertEqual("remind", response.json()["postponed"]["kind"])
+        response = self.client.delete(url)
+        self.assertEqual(200, response.status_code)
+        self.assertIsNone(response.json()["postponed"])
+
+    def test_postpone_invalid(self):
+        self.client.force_login(self.org_manager)
+        url = self._postpone_url(self.participant)
+        past = (now() - timedelta(minutes=1)).isoformat()
+        future = (now() + timedelta(days=1)).isoformat()
+        for data in (
+            {"kind": "block", "until": past},
+            {"kind": "nope", "until": future},
+            {"kind": "block"},
+        ):
+            with self.subTest(data=data):
+                response = self.client.post(url, data, format="json")
+                self.assertEqual(400, response.status_code)
+
+    def test_postpone_not_manager(self):
+        self.client.force_login(self.moderator)
+        response = self.client.delete(self._postpone_url(self.participant))
+        self.assertEqual(403, response.status_code)
+
+    def test_postpone_other_organisation(self):
+        self.client.force_login(self.org_manager)
+        other = User.objects.get(username="elsewhere")
+        self.assertEqual(404, self.client.delete(self._postpone_url(other)).status_code)
