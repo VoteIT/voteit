@@ -60,7 +60,7 @@ All methods silently return an empty result for anonymous (unauthenticated) user
 - `img_url` — external profile image URL
 - `image` — uploaded profile image (stored at `org_{org_id}/images/{uuid}.{ext}`)
 - `anonymised` — when `anonymise.anonymise_user` blanked the row, or null. Exposed read-only on `UserSerializer` / `UserListSerializer`; the frontend renders a "removed user" label for it
-- `removal_requested` — GDPR: when the user asked to be removed, or null. Set by the user via `POST /api/user/request-removal/` (no body), cleared by aborting with the token from the email (`POST /api/user/abort-removal/`)
+- `removal_requested` — GDPR: when the user asked to be removed, or null. Set and cleared by the user via `POST /api/user/request-removal/` with `{"request_removal": bool}`, or cleared by aborting with the token from the email (`POST /api/user/abort-removal/`)
 
 `userid` uniqueness is enforced per organisation via a `UniqueConstraint`. The `UserIDValidator` restricts charset to `[a-z0-9-_]`.
 
@@ -89,11 +89,7 @@ default cache is the developer's real redis, never cleared between tests.
 
 ## Removal requests (`removal.py`)
 
-`POST /api/user/request-removal/` (no body, 204) sets `removal_requested` and logs the
-user out everywhere, like `logout` with `everywhere`. Nothing more can happen on the
-account while the request stands: a new login stops at `stop_if_removal_requested`. So
-the only way back is aborting with a token, and the frontend shows the warning. On
-commit, the request also schedules an
+`POST /api/user/request-removal/` sets `removal_requested` and, on commit, schedules an
 email `REMOVAL_EMAIL_DELAY_MINUTES` (default 10) later in the `long` queue (`enqueue_in`, job id `user-removal-email-<pk>`).
 The email is the guard against someone else requesting removal from the owner's
 unattended session, so it goes to the account's address with an abort link to the

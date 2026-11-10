@@ -282,6 +282,15 @@ class LogoutSerializer(serializers.Serializer):
     )
 
 
+class RequestRemovalSerializer(serializers.Serializer):
+    request_removal = serializers.BooleanField(
+        help_text=(
+            "Ask to have this account and its data removed. False withdraws "
+            "the request."
+        ),
+    )
+
+
 class AbortRemovalSerializer(serializers.Serializer):
     token = serializers.CharField(help_text="The token from the removal email.")
 

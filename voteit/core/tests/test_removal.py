@@ -202,9 +202,12 @@ class RemovalAPITests(RemovalTestMixin, APITestCase):
         with (
             patch(f"{VIEWS}.schedule_removal_email") as schedule,
             self.captureOnCommitCallbacks(execute=True),
-            patch(f"{VIEWS}.close_user_connections"),
         ):
-            self.client.post(reverse("user-request-removal"), HTTP_ACCEPT_LANGUAGE="sv")
+            self.client.post(
+                reverse("user-request-removal"),
+                {"request_removal": True},
+                HTTP_ACCEPT_LANGUAGE="sv",
+            )
         schedule.assert_called_once()
         self.assertEqual(self.user.pk, schedule.call_args.args[0].pk)
         self.assertEqual("sv", schedule.call_args.args[1])
@@ -216,10 +219,22 @@ class RemovalAPITests(RemovalTestMixin, APITestCase):
         with (
             patch(f"{VIEWS}.schedule_removal_email") as schedule,
             self.captureOnCommitCallbacks(execute=True),
-            patch(f"{VIEWS}.close_user_connections"),
         ):
-            self.client.post(reverse("user-request-removal"))
+            self.client.post(reverse("user-request-removal"), {"request_removal": True})
         schedule.assert_not_called()
+
+    def test_withdraw_cancels_email(self):
+        self.user.removal_requested = now()
+        self.user.save()
+        self.client.force_login(self.user)
+        with (
+            patch(f"{VIEWS}.cancel_removal_email") as cancel,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            self.client.post(
+                reverse("user-request-removal"), {"request_removal": False}
+            )
+        cancel.assert_called_once_with(self.user.pk)
 
     def test_abort_with_token_anonymous(self):
         self.user.removal_requested = now()

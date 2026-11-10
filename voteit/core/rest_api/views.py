@@ -35,6 +35,7 @@ from voteit.core.rest_api.serializers import AbortRemovalSerializer
 from voteit.core.rest_api.serializers import LogoutSerializer
 from voteit.core.rest_api.serializers import MessageSerializer
 from voteit.core.rest_api.serializers import ProviderSerializer
+from voteit.core.rest_api.serializers import RequestRemovalSerializer
 from voteit.core.rest_api.serializers import StateMachineSchemaSerializer
 from voteit.core.rest_api.serializers import UserAndRolesSerializer
 from voteit.core.rest_api.serializers import UserConnectionSerializer
@@ -167,36 +168,53 @@ class UserView(
         session_key = request.session.session_key
         log_auth("Logout everywhere" if everywhere else "Logout", request=request)
         if everywhere:
-            _logout_everywhere(request)
-            return Response()
-        if session_key:
+            # First, so no in-flight request can refresh a session that is
+            # about to be killed.
+            end_tracked_sessions(user_pk)
+        elif session_key:
             forget_session(user_pk, session_key)
         logout(request)
         # No notice beside the close: the close code says "logged out" by
         # itself -- 4001 for every device, 4000 for this one -- and the client
         # is what knows how to word either.
-        if session_key:
+        if everywhere:
+            close_user_connections(
+                user_pk,
+                code=LOGGED_OUT_EVERYWHERE,
+                # Sockets flush their own session on the way out, which is what
+                # reaches a device end_tracked_sessions could not name.
+                flush_session=True,
+            )
+        elif session_key:
             close_session_connections(session_key, code=LOGGED_OUT)
         return Response()
 
-    @action(methods=["POST"], detail=False, url_path="request-removal")
+    @action(
+        methods=["POST"],
+        detail=False,
+        url_path="request-removal",
+        serializer_class=RequestRemovalSerializer,
+    )
     def request_removal(self, request):
         """
-        POST /api/user/request-removal/ -- ask for removal of this account.
+        POST /api/user/request-removal/ -- ask for, or withdraw, removal of this account.
 
-        Logs the user out everywhere, so nothing more happens on the account
-        while the request stands. Logging in again leads to the abort page.
+        Responds with the user, where ``removal_requested`` holds the time of
+        the request or null.
         """
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
         user = request.user
-        # Asking again keeps the original time, and doesn't send another email.
-        if user.removal_requested is None:
-            user.removal_requested = now()
-            user.save(update_fields=["removal_requested"])
-            language = get_language()
-            transaction.on_commit(lambda: schedule_removal_email(user, language))
-        log_auth("Removal requested", request=request)
-        _logout_everywhere(request)
-        return Response(status=204)
+        if serializer.validated_data["request_removal"]:
+            # Asking again keeps the original time, and doesn't send another email.
+            if user.removal_requested is None:
+                user.removal_requested = now()
+                user.save(update_fields=["removal_requested"])
+                language = get_language()
+                transaction.on_commit(lambda: schedule_removal_email(user, language))
+        elif user.removal_requested is not None:
+            _abort_removal(user)
+        return Response(UserAndRolesSerializer(user, context={"request": request}).data)
 
     @action(
         methods=["POST"],
@@ -323,21 +341,6 @@ class UserView(
         messages = get_messages(request)
         serializer = self.get_serializer(messages, many=True)
         return Response(data=serializer.data)
-
-
-def _logout_everywhere(request) -> None:
-    user_pk = request.user.pk
-    # First, so no in-flight request can refresh a session that is about to be
-    # killed.
-    end_tracked_sessions(user_pk)
-    logout(request)
-    close_user_connections(
-        user_pk,
-        code=LOGGED_OUT_EVERYWHERE,
-        # Sockets flush their own session on the way out, which is what reaches
-        # a device end_tracked_sessions could not name.
-        flush_session=True,
-    )
 
 
 def _abort_removal(user) -> None:
