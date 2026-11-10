@@ -499,6 +499,54 @@ class UserViewSetTests(IsolatedCacheMixin, APITestCase):
         self.participant.refresh_from_db()
         self.assertIsNone(self.participant.removal_requested)
 
+    def test_removal_requested_locked_out(self):
+        self.participant.removal_requested = now()
+        self.participant.save()
+        self.client.force_login(self.participant)
+        detail = reverse("user-detail", kwargs={"pk": self.participant.pk})
+        for method, url in (
+            ("get", reverse("meeting-roles-list")),
+            ("patch", detail),
+            ("post", reverse("user-disconnect")),
+        ):
+            with self.subTest(method=method, url=url):
+                response = getattr(self.client, method)(url, {}, format="json")
+                self.assertEqual(403, response.status_code)
+                self.assertEqual("removal_requested", response.json()["code"])
+
+    def test_removal_requested_may_read_and_leave(self):
+        self.participant.removal_requested = now()
+        self.participant.save()
+        self.client.force_login(self.participant)
+        detail = reverse("user-detail", kwargs={"pk": self.participant.pk})
+        for url in (
+            reverse("user-list"),
+            detail,
+            reverse("user-alternate"),
+            reverse("user-connections"),
+            reverse("user-email-choices"),
+        ):
+            with self.subTest(url=url):
+                self.assertEqual(200, self.client.get(url).status_code)
+        response = self.client.post(
+            reverse("user-switch", kwargs={"pk": self.moderator.pk})
+        )
+        self.assertEqual(200, response.status_code)
+
+    def test_removal_requested_may_logout(self):
+        self.participant.removal_requested = now()
+        self.participant.save()
+        self.client.force_login(self.participant)
+        with patch(f"{VIEWS}.close_session_connections"):
+            response = self.client.post(reverse("user-logout"))
+        self.assertEqual(200, response.status_code)
+
+    def test_other_permission_errors_have_no_code(self):
+        self.client.force_login(self.participant)
+        response = self.client.get(reverse("removal-requests-list"))
+        self.assertEqual(403, response.status_code)
+        self.assertNotIn("code", response.json())
+
     def test_request_removal_requires_value(self):
         self.client.force_login(self.participant)
         response = self.client.post(reverse("user-request-removal"), {}, format="json")

@@ -127,6 +127,20 @@ class UserView(
     """
 
     serializer_class = UserAndRolesSerializer
+    # Open to a user with a pending removal request: reading, leaving, and
+    # retracting the request. See permissions.IsAuthenticated.
+    removal_requested_actions = frozenset(
+        {
+            "list",
+            "retrieve",
+            "alternate",
+            "connections",
+            "email_choices",
+            "logout",
+            "switch",
+            "request_removal",
+        }
+    )
 
     def get_queryset(self):
         """

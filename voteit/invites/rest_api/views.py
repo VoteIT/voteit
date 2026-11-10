@@ -12,7 +12,6 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import MultiPartParser
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
@@ -524,7 +523,6 @@ class HandleMatchedInvitesViewSet(
     """
 
     serializer_class = serializers.ExternalMeetingInviteSerializer
-    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         organisation = self.request.user.organisation
@@ -596,8 +594,6 @@ class InviteDataTypesViewSet(ViewSet):
     organisation. Used by the frontend to know which identity and annotation
     fields to offer when building invite forms.
     """
-
-    permission_classes = [IsAuthenticated]
 
     def list(self, request):
         """

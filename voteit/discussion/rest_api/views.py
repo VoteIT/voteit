@@ -3,7 +3,6 @@ import csv
 from django.http import Http404
 from django.http import HttpResponse
 from django.db import models
-from rest_framework import permissions
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.renderers import JSONRenderer
@@ -61,7 +60,6 @@ class DiscussionPostViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
 @router.register("export-discussion-posts", basename="export-discussion-posts")
 class ExportDiscussionPostsViewSet(viewsets.GenericViewSet):
     model = DiscussionPost
-    permission_classes = [permissions.IsAuthenticated]
     serializer_class = serializers.DiscussionPostExportSerializer
 
     def get_queryset(self):

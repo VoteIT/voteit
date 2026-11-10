@@ -6,7 +6,6 @@ from django.db import transaction
 from django.db.models import QuerySet
 from django.http import Http404
 from django.http import HttpResponse
-from rest_framework import permissions
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -176,7 +175,6 @@ class AgendaViewSet(VerboseAutoPermissionViewSetMixin, StateMachineMixin, ModelV
 @router.register("export-agenda-items", basename="export-agenda-items")
 class ExportAgendaItemsViewSet(viewsets.GenericViewSet):
     model = Meeting
-    permission_classes = [permissions.IsAuthenticated]
     serializer_class = serializers.ExportAgendaItemSerializer
 
     def get_queryset(self) -> QuerySet:

@@ -35,6 +35,7 @@ from voteit.core.removal import remove_user
 from voteit.core.rest_api import router
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.core.rest_api.permissions import HasIDProxyAPIKey
+from voteit.core.rest_api.permissions import IsAuthenticated
 from voteit.organisation.matching import find_candidates
 from voteit.organisation.matching import is_elevated
 from voteit.organisation.models import GlobalTermsOfService
@@ -197,7 +198,7 @@ class TermsOfServiceViewSet(
     @action(
         detail=False,
         methods=["post"],
-        permission_classes=[permissions.IsAuthenticated],
+        permission_classes=[IsAuthenticated],
         serializer_class=serializers.AcceptTermsOfServiceSerializer,
     )
     def accept(self, request):
@@ -230,7 +231,6 @@ class OrganisationRolesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         "^user__first_name",
         "^user__last_name",
     )
-    permission_classes = (permissions.IsAuthenticated,)
 
     def get_queryset(self):
         user = self.request.user

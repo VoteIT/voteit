@@ -16,7 +16,6 @@ from voteit.messaging.channels import user_group
 from voteit.messaging.consumer import VoteitConsumer
 from voteit.messaging.messages import RecheckSubscriptions
 from rest_framework import mixins
-from rest_framework import permissions
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
@@ -168,7 +167,6 @@ class MeetingRolesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     filter_backends = (DjangoFilterBackend, SearchFilter)
     filterset_class = MeetingRolesFilter
     search_fields = ("^user__userid", "^user__first_name", "^user__last_name")
-    permission_classes = (permissions.IsAuthenticated,)
 
     def get_queryset(self):
         return MeetingRoles.objects.filter(
@@ -504,8 +502,6 @@ class ExportParticipantsViewSet(viewsets.GenericViewSet):
 
 @router.register("export-meeting-groups", basename="export-meeting-groups")
 class ExportMeetingGroupsViewSet(viewsets.GenericViewSet):
-    permission_classes = [permissions.IsAuthenticated]
-
     def get_queryset(self) -> QuerySet:
         return Meeting.objects.filter(
             roles__user=self.request.user, roles__assigned__contains=ROLE_MODERATOR
@@ -556,8 +552,6 @@ class MeetingDialectsViewSet(viewsets.ViewSet):
     """
     Endpoint for installable meeting dialects
     """
-
-    permission_classes = [permissions.IsAuthenticated]
 
     def list(self, request, *args, **kwargs):
         org_installable = dialect_registry.get_org_installable(

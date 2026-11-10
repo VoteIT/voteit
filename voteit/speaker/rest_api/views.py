@@ -8,7 +8,6 @@ from django.http import HttpResponse
 from django.utils.functional import cached_property
 from django.utils.translation import gettext as _
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import permissions
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound
@@ -124,7 +123,6 @@ class HistoricSpeakerViewSet(
     )
     serializer_class = serializers.HistoricSpeakerListSerializer
     filterset_class = SpeakerFilterSet
-    permission_classes = (permissions.IsAuthenticated,)
 
 
 @router.register("speaker-list-systems", basename="speaker-list-systems")
@@ -158,7 +156,6 @@ class SpeakerListSystemViewSet(
 @router.register("speaker-system-roles", basename="speaker-system-roles")
 class SpeakerSystemRolesViewSet(ListModelMixin, GenericViewSet):
     serializer_class = serializers.SpeakerSystemRolesSerializer
-    permission_classes = (permissions.IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filterset_class = SpeakerSystemRolesFilterSet
 
@@ -379,7 +376,6 @@ class SpeakerViewSet(
 @router.register("export-speakers", basename="export-speakers")
 class ExportSpeakersViewSet(viewsets.GenericViewSet):
     model = SpeakerListSystem
-    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         return SpeakerListSystem.objects.filter(

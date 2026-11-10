@@ -196,7 +196,6 @@ class ElectoralRegisterPoliciesViewSet(ViewSet):
 @router.register("export-electoral-register", basename="export-electoral-register")
 class ExportERViewSet(viewsets.GenericViewSet):
     model = ElectoralRegister
-    permission_classes = [permissions.IsAuthenticated]
     serializer_class = serializers.VoterExportSerializer
 
     def get_queryset(self):

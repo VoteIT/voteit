@@ -118,6 +118,12 @@ sends the removal confirmation after commit. The caller holds the row lock.
 `end_user_access(user_pk)` (`sessions.py`) is the shared "log out everywhere" for code
 running outside the user's own request.
 
+While a request is pending the user is locked out of the REST API by the default
+permission, `voteit.core.rest_api.permissions.IsAuthenticated`: a 403 with
+`"code": "removal_requested"` in the body. Actions that stay open are listed by name in the
+view's `removal_requested_actions` -- on `UserView`, the reads, `logout`, `switch` and
+`request_removal`. Don't set `IsAuthenticated` explicitly where the default would do.
+
 Logging in to an account with a pending request is stopped by the
 `stop_if_removal_requested` pipeline step, which redirects to the same abort page
 with a fresh token (`abort_removal_path`).

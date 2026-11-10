@@ -4,7 +4,6 @@ from django.db import transaction
 from django.db.models import QuerySet
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
@@ -24,7 +23,6 @@ logger = getLogger(__name__)
 class AccessPoliciesViewSet(ReadOnlyModelViewSet):
     model = Meeting
     serializer_class = serializers.MeetingAccessPoliciesSerializer
-    permission_classes = (IsAuthenticated,)
 
     def get_queryset(self) -> QuerySet:
         return Meeting.objects.for_user(self.request.user)
