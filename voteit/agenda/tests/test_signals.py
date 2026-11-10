@@ -5,13 +5,11 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.test import TestCase
-from django.test import override_settings
 from voteit.agenda.messages import AgendaChanged
 
 from voteit.messaging.testing import MessageCatcher
 from voteit.messaging.testing import action_of
 from voteit.messaging.testing import build_app_state
-from voteit.messaging.testing import testing_channel_layers_setting
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.messages import AgendaBodyChanged
@@ -26,7 +24,6 @@ from voteit.meeting.roles import ROLE_MODERATOR
 User = get_user_model()
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class SubscribedTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -87,7 +84,6 @@ class SubscribedTests(TestCase):
         )
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class AgendaChangedTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -167,7 +163,6 @@ class AgendaChangedTests(TestCase):
         self.assertEqual(ai_pk, msg.payload.pk)
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class DeleteWithContentTests(TestCase):
     def test_no_changed_after_deleted(self):
         """Deleting children in the cascade must not resurrect the item client side."""
@@ -199,7 +194,6 @@ def _dt(msg: AgendaChanged) -> datetime:
     return datetime.fromisoformat(msg.payload.related_modified)
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class RelatedItemsTests(TestCase):
     @classmethod
     def setUpTestData(cls):

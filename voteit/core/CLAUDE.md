@@ -85,7 +85,7 @@ An ordinary logout closes only that session's sockets and calls `forget_session`
 so it does not leave a dead key behind.
 
 Tests that touch the cache must use `IsolatedCacheMixin` from `testing.py` — the
-default cache is the developer's real redis, never cleared between tests.
+default cache lives for the whole run and is never cleared between tests.
 
 ## Removal requests (`removal.py`)
 
@@ -374,13 +374,15 @@ python manage.py test voteit.core --keepdb --failfast
 
 Doctests across all modules are run via `test_docs.py` using `load_doctests` from `testing.py`. Most utility functions, field behaviour, and the predicate/registry systems are covered by doctests in-situ.
 
+`TEST_RUNNER` is `test_runner.VoteITTestRunner`, which keeps tests off the developer's redis: the cache (and cache-backed sessions) becomes `LocMemCache`, the channel layer `InMemoryChannelLayer`, and RQ queues move to redis db 15, flushed at start.
+
 `testing.py` exports several helpers for use across the project:
 
 - `FakeCommit` — context manager that flushes `on_commit` hooks inside a test transaction (avoids needing `TransactionTestCase`)
 - `run_permission_tests(tester, url=..., method=..., expected=[...])` — iterates a matrix of (user, expected_status) pairs, rolling back after each via savepoints
 - `mk_usertag(value)` / `mk_hashtag(tag)` — produce Quill editor mention HTML for use in body field tests
 - `load_doctests(tests, package)` — wires a package's doctests into Django's test loader
-- `IsolatedCacheMixin` / `isolated_cache` / `ISOLATED_CACHES` — a per-process cache, emptied before each test. Anything that both writes and reads the cache needs this: the default one is the developer's real redis, shared and never cleared, so such a test passes alone and fails in a full run
+- `IsolatedCacheMixin` / `isolated_cache` / `ISOLATED_CACHES` — a per-process cache, emptied before each test. Anything that both writes and reads the cache needs this: the default one lives for the whole run and is never cleared, so such a test passes alone and fails in a full run
 
 ## Non-obvious Design Decisions
 

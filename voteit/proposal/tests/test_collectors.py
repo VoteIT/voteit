@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
 from django.db import connection
 
@@ -16,7 +15,6 @@ from voteit.messaging.registry import batch_for
 from voteit.messaging.state import AppState
 from voteit.messaging.testing import payloads_of
 from voteit.messaging.testing import run_collector
-from voteit.messaging.testing import testing_channel_layers_setting
 from voteit.proposal.collectors import _fetch_mentions_map
 from voteit.proposal.diff import Changes
 from voteit.proposal.collectors import attach_proposals
@@ -44,7 +42,6 @@ def _wire(payloads) -> dict[int, dict]:
     return {item["pk"]: item for item in dumped["payload"]["items"]}
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class AttachProposalsEquivalenceTests(TestCase):
     """``attach_proposals`` builds payloads with .values(), not the serializer.
 
@@ -177,7 +174,6 @@ class AttachProposalsEquivalenceTests(TestCase):
         self._from_collector(include_private=True)
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class AttachProposalsMentionsTests(TestCase):
     """Mentions are injected separately to dodge the M2M .values() fan-out."""
 
@@ -232,7 +228,6 @@ class AttachProposalsMentionsTests(TestCase):
         self.assertEqual(len(before), len(after))
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class ProposalsCollectorTests(TestCase):
     """The `proposal.proposals` collector: visibility and shape."""
 
@@ -337,7 +332,6 @@ class ProposalsCollectorTests(TestCase):
         )
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class TextDocumentsCollectorTests(TestCase):
     """`proposal.text_documents`, on the agenda item channel."""
 

@@ -4,7 +4,6 @@ from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ObjectDoesNotExist
 from django.test import TestCase
-from django.test import override_settings
 from voteit.messaging.testing import build_app_state
 from voteit.messaging.testing import payloads_of
 from voteit.messaging.testing import run_collector
@@ -27,12 +26,6 @@ from voteit.reactions.models import ReactionButton
 User = get_user_model()
 
 
-_channel_layers_setting = {
-    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
-}
-
-
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class SignalButtonTests(TestCase):
     @classmethod
     def setUpTestData(cls):

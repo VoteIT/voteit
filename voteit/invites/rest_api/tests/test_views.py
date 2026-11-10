@@ -7,7 +7,6 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.test import override_settings
-from voteit.messaging.testing import testing_channel_layers_setting
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 from social_django.models import UserSocialAuth
@@ -891,7 +890,6 @@ class MeetingInviteViewSetCreateTests(APITestCase):
         self.assertEqual(response.status_code, 400)
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class MeetingInviteViewSetAnnotationWsTests(APITestCase):
     """Verify that MeetingInviteChanged is published when annotations are added via REST."""
 

@@ -11,11 +11,9 @@ from voteit.meeting.models import Meeting
 from voteit.messaging.registry import collectors_for
 from voteit.messaging.registry import context_channel_registry
 from voteit.messaging.testing import MessageCatcher
-from voteit.messaging.testing import testing_channel_layers_setting
 from voteit.organisation.models import Organisation
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class BroadcastMeetingTests(TestCase):
     """The replacement for the old ``meeting`` channel.
 
@@ -68,7 +66,6 @@ class BroadcastMeetingTests(TestCase):
             self._broadcast(self.meeting)
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class BroadcastBatchingTests(TestCase):
     """Batching survives the split -- it just collapses once per group."""
 

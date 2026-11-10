@@ -132,8 +132,9 @@ exclude_also = [
 [tool.ruff]
 include = ["pyproject.toml", "voteit/**/*.py", "src/**/*.py", "locust/*.py"]
 # Ruff 0.17 widened its default rule set; keep the pre-0.17 defaults.
-lint.select = ["E4", "E7", "E9", "F"]
+lint.select = ["E4", "E7", "E9", "F", "TID251"]
 lint.isort.force-single-line = true
+lint.flake8-tidy-imports.banned-api."django_rq.job".msg = "Binds the redis connection at import, before the test runner moves it. Use voteit.core.decorators.job."
 # E402: load_dotenv() must run before "from .settings import *" so that
 # settings can read the environment.
 lint.per-file-ignores."project/*.py" = ["E402", "F403", "F405"]

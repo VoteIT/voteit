@@ -2,10 +2,8 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from django.test import override_settings
 from voteit.messaging.testing import action_of
 from voteit.messaging.testing import build_app_state
-from voteit.messaging.testing import testing_channel_layers_setting
 
 from voteit.invites.channels import MeetingInvitesChannel
 from voteit.invites.messages import MeetingInviteChanged
@@ -21,9 +19,6 @@ from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 User = get_user_model()
 
 
-@override_settings(
-    CHANNEL_LAYERS=testing_channel_layers_setting,
-)
 class InviteTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -68,7 +63,6 @@ class InvitesExpireWhenMeetingArchivedTests(TestCase):
         self.assertEqual(InviteStateMachine.expired.id, self.inv1.state)
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class InvitesSubscribedTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -106,7 +100,6 @@ class InvitesSubscribedTests(TestCase):
         self.assertFalse(data.keys())
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class MeetingInviteSignalTests(TestCase):
     @classmethod
     def setUpTestData(cls):

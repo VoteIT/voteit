@@ -1,6 +1,5 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from django.test import override_settings
 
 from voteit.agenda.collectors import AGENDA_ITEM_FIELDS
 from voteit.agenda.collectors import AgendaItems
@@ -15,12 +14,10 @@ from voteit.messaging.registry import batch_for
 from voteit.messaging.state import AppState
 from voteit.messaging.testing import payloads_of
 from voteit.messaging.testing import run_collector
-from voteit.messaging.testing import testing_channel_layers_setting
 
 User = get_user_model()
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class AgendaItemsCollectorTests(TestCase):
     """`agenda.items` builds payloads with .values() instead of the serializer.
 

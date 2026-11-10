@@ -219,9 +219,8 @@ def run_permission_tests(
 
 #: A cache of this test process's own.
 #:
-#: The default cache is the developer's real redis, shared with whatever else
-#: is running against it and never cleared between tests or between runs.
-#: Anything that both writes and reads it -- session-key tracking, say -- needs
+#: The default cache (see VoteITTestRunner) lives as long as the test run and
+#: is never cleared between tests. Anything that both writes and reads it -- session-key tracking, say -- needs
 #: this, or it passes alone and fails in a full run when another test happens
 #: to have written the same key.
 ISOLATED_CACHES = {

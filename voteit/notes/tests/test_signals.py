@@ -1,11 +1,9 @@
 from django.test import TestCase
-from django.test import override_settings
 from voteit.messaging.channels import UserChannel
 from voteit.messaging.testing import action_of
 from voteit.messaging.testing import build_app_state
 from voteit.messaging.testing import run_collector
 from voteit.messaging.testing import ChannelMessageCatcher
-from voteit.messaging.testing import testing_channel_layers_setting
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.meeting.models import Meeting
@@ -15,7 +13,6 @@ from voteit.notes.messages import NoteChanged
 from voteit.notes.messages import NoteDeleted
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class SignalTests(TestCase):
     fixtures = ["meeting_test_fixture"]
 

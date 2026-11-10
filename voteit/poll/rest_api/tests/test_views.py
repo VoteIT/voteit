@@ -2,11 +2,9 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
-from django.test import override_settings
 from django.utils import timezone
 from voteit.messaging.channels import UserChannel
 from voteit.messaging.testing import ChannelMessageCatcher
-from voteit.messaging.testing import testing_channel_layers_setting
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 
@@ -470,7 +468,6 @@ class ElectoralRegisterPolicyViewSetTests(APITestCase):
         )
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 @patch.dict(
     vote_transfer_policies,
     {UnrestrictedVoteTransferPolicy.name: UnrestrictedVoteTransferPolicy},
@@ -898,7 +895,6 @@ class PollStateMachineSchemaTests(APITestCase):
         self.assertIn("events", response.data)
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class VoteViewSetTests(APITestCase):
     """Covers the add/change/abstain vote upsert, previously the AddVote/AbstainVote
     WS messages. Uses the "simple" poll method as the base, same as the old tests.

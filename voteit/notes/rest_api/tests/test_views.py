@@ -3,11 +3,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from django.contrib.auth import get_user_model
-from voteit.messaging.testing import testing_channel_layers_setting
 from rest_framework import status
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
-from django.test.utils import override_settings
 
 from voteit.meeting.models import Meeting
 
@@ -17,7 +15,6 @@ if TYPE_CHECKING:
 User: UserType = get_user_model()
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class NoteViewSetTests(APITestCase):
     fixtures = ["meeting_test_fixture"]
 

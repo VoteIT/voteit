@@ -4,9 +4,7 @@ from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from django.test import override_settings
 from django.utils.timezone import now
-from voteit.messaging.testing import testing_channel_layers_setting
 from social_django.models import UserSocialAuth
 
 from voteit.meeting.models import Meeting
@@ -27,7 +25,6 @@ def _mk_meeting(org):
     return Meeting.objects.create(organisation=org)
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class DeactivateUnusedUsersTests(TestCase):
     @classmethod
     def setUpTestData(cls):

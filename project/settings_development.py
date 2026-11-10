@@ -15,7 +15,10 @@ for qname in {"default", "long"}:
     RQ_QUEUES[qname] = {"HOST": "localhost", "DB": 1, "PORT": 6379}
 
 
-if platform.system() in ("Windows",):
+# No fork per job. On macOS a forked work-horse aborts (signal 6) as soon as it
+# touches a system framework, e.g. socket.getfqdn() when send_mail builds a
+# Message-ID.
+if platform.system() in ("Windows", "Darwin"):
     RQ["WORKER_CLASS"] = "rq.SimpleWorker"
 
 # Change this to debug PSA-backends!

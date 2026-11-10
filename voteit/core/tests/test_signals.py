@@ -2,8 +2,6 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from django.test import override_settings
-from voteit.messaging.testing import testing_channel_layers_setting
 from voteit.organisation.channels import OrganisationChannel
 from voteit.organisation.models import Organisation
 
@@ -12,7 +10,6 @@ from voteit.core.messages.user import InvalidateUserCache
 User = get_user_model()
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class UserChangedSignalTests(TestCase):
     @classmethod
     def setUpTestData(cls):

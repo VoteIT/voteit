@@ -8,13 +8,13 @@ from django.template import loader
 from django.utils.html import strip_tags
 from django.utils.timezone import now
 from django.utils.translation import gettext as _
-from django_rq import job
 from social_django.models import Code
 from social_django.models import Nonce
 from social_django.models import Partial
 from social_django.models import UserSocialAuth
 
 from voteit.core import RQ_LONG_QUEUE
+from voteit.core.decorators import job
 from voteit.core.decorators import schedule_job
 from voteit.organisation.models import OAuth2Provider
 

@@ -43,18 +43,18 @@ TEST_TARGET := $(or $(filter-out test,$(MAKECMDGOALS)),voteit)
 COVERAGE_TARGET := $(or $(filter-out coverage,$(MAKECMDGOALS)),voteit)
 COVERAGE_PATH := $(subst .,/,$(COVERAGE_TARGET))
 test:
-	REDIS_CACHE_LOCATION=redis://127.0.0.1:6379/9 POSTGRES_PORT=5433 python manage.py test $(TEST_TARGET) --keepdb --failfast
+	POSTGRES_PORT=5433 python manage.py test $(TEST_TARGET) --keepdb --failfast
 # Passing the command line explicitly overrides [tool.coverage.run] command_line.
 # The report is limited to the target's own files: measurement still covers all of
 # `source` (voteit), so without --include every untouched module would be listed.
 coverage:
-	REDIS_CACHE_LOCATION=redis://127.0.0.1:6379/9 POSTGRES_PORT=5433 coverage run manage.py test $(COVERAGE_TARGET) --keepdb && coverage report --include="$(COVERAGE_PATH)/*,$(COVERAGE_PATH).py"
+	POSTGRES_PORT=5433 coverage run manage.py test $(COVERAGE_TARGET) --keepdb && coverage report --include="$(COVERAGE_PATH)/*,$(COVERAGE_PATH).py"
 ifneq (,$(filter $(firstword $(MAKECMDGOALS)),test coverage))
 %:
 	@:
 endif
 test-deps:
-	REDIS_CACHE_LOCATION=redis://127.0.0.1:6379/9 POSTGRES_PORT=5433 python manage.py test voteit_org --keepdb --failfast
+	POSTGRES_PORT=5433 python manage.py test voteit_org --keepdb --failfast
 sync:
 	uv sync
 	for p in src/*/pyproject.toml; do [ ! -f "$$p" ] || uv pip install --python .venv --no-deps -e "$$(dirname "$$p")"; done

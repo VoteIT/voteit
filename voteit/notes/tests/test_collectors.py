@@ -1,5 +1,4 @@
 from django.test import TestCase
-from django.test import override_settings
 
 from voteit.meeting.models import Meeting
 from voteit.messaging.channels import UserChannel
@@ -7,7 +6,6 @@ from voteit.messaging.testing import ChannelMessageCatcher
 from voteit.messaging.testing import assert_frames_equal
 from voteit.messaging.testing import payloads_of
 from voteit.messaging.testing import run_collector
-from voteit.messaging.testing import testing_channel_layers_setting
 from voteit.notes import NoteIntent
 from voteit.messaging.values import wire_field_names
 from voteit.notes.collectors import note_payloads
@@ -16,7 +14,6 @@ from voteit.notes.messages import NoteChanged
 from voteit.notes.rest_api.serializers import NoteSerializer
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class NoteWireShapeTests(TestCase):
     """`note.changed` payloads are built with .values(), not NoteSerializer.
 

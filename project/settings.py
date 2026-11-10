@@ -30,6 +30,7 @@ for env_setting in (
     "ID_HOST",
     "ID_HOST_BACKEND",
     "ID_PROXY_API_KEY",
+    "EMAIL_BACKEND",
     "EMAIL_HOST",
     "DEFAULT_FROM_EMAIL",
     "EMAIL_PORT",

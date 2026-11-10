@@ -12,7 +12,6 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from django.test import override_settings
 
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.channels import ModeratorsChannel
@@ -22,7 +21,6 @@ from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.messaging.channels import UserChannel
 from voteit.messaging.channels import session_group
 from voteit.messaging.channels import user_group
-from voteit.messaging.testing import testing_channel_layers_setting
 from voteit.organisation.models import Organisation
 
 from .test_jobs import receive_or_none
@@ -115,7 +113,6 @@ class ContextChannelPermissionTests(TestCase):
             self.assertEqual(self.meeting, channel.context)
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class SubscribeLeaveTests(TestCase):
     consumer_channel = "specific.abcdef!ghijkl"
 

@@ -1,10 +1,8 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from django.test import override_settings
 from voteit.messaging.testing import action_of
 from voteit.messaging.testing import build_app_state
 from voteit.messaging.testing import ChannelMessageCatcher
-from voteit.messaging.testing import testing_channel_layers_setting
 
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import Meeting
@@ -18,7 +16,6 @@ from voteit.participant_tags.messages import ParticipantTagsChanged
 User = get_user_model()
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class SignalAndSubscribeTests(TestCase):
     fixtures = ["meeting_test_fixture"]
 

@@ -1,6 +1,5 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from django.test import override_settings
 
 from voteit.discussion.collectors import discussion_post_payloads
 from voteit.discussion.messages import DiscussionPostChanged
@@ -10,13 +9,11 @@ from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.messaging.testing import assert_frames_equal
 from voteit.messaging.testing import payloads_of
 from voteit.messaging.testing import run_collector
-from voteit.messaging.testing import testing_channel_layers_setting
 from voteit.messaging.values import wire_field_names
 
 User = get_user_model()
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class DiscussionPostWireShapeTests(TestCase):
     """`discussion.posts` builds payloads with .values(), not the serializer.
 

@@ -2,7 +2,6 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from django.test import override_settings
 
 from voteit.messaging.testing import build_app_state
 
@@ -11,12 +10,8 @@ from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
 
 User = get_user_model()
-_channel_layers_setting = {
-    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
-}
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class AgendaSubscribedTests(TestCase):
     def setUp(self):
         self.meeting = Meeting.objects.create()
@@ -40,7 +35,6 @@ class AgendaSubscribedTests(TestCase):
         self.assertEqual({self.disc1.pk, self.disc2.pk}, {x.pk for x in payloads})
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class DiscussionPostChangedTests(TestCase):
     @classmethod
     def setUpTestData(cls):

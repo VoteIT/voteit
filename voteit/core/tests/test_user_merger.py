@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from django.test import TestCase
-from django.test import override_settings
-from voteit.messaging.testing import testing_channel_layers_setting
 
 from voteit.core.user_merger import UserMerger
 from voteit.meeting.models import Meeting
@@ -34,7 +32,6 @@ def _mk_meeting(org):
     return Meeting.objects.create(organisation=org)
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class ValidationTests(TestCase):
     """Validation errors and source-deactivation behaviour."""
 
@@ -74,7 +71,6 @@ class ValidationTests(TestCase):
         self.assertTrue(self.source.is_active)
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class RolesTests(TestCase):
     """Meeting and organisation role merging."""
 
@@ -143,7 +139,6 @@ class RolesTests(TestCase):
         self.assertIn(self.ROLE_MEETING_CREATOR.name, target_or.assigned)
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class PollTests(TestCase):
     """Vote and electoral register migration."""
 
@@ -200,7 +195,6 @@ class PollTests(TestCase):
         self.assertTrue(any("ElectoralRegister" in msg for msg in log.skipped))
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class ContentTests(TestCase):
     """Active users, proposals, speaker lists, and mentions."""
 

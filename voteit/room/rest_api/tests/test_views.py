@@ -1,8 +1,6 @@
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.test import override_settings
-from voteit.messaging.testing import testing_channel_layers_setting
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 
@@ -21,7 +19,6 @@ from voteit.speaker.roles import ROLE_LIST_MODERATOR
 User = get_user_model()
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class RoomsViewTestCase(APITestCase):
     fixtures = ["meeting_test_fixture"]
 

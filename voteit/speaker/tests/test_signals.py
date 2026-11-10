@@ -1,13 +1,11 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from django.test import override_settings
 from django.utils.timezone import now
 from rest_framework.exceptions import ValidationError
 from voteit.messaging.testing import payloads_of
 from voteit.messaging.testing import action_of
 from voteit.messaging.testing import build_app_state
 from voteit.messaging.testing import ChannelMessageCatcher
-from voteit.messaging.testing import testing_channel_layers_setting
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.core.messages.role_updates import RolesChanged
@@ -31,7 +29,6 @@ from voteit.speaker.statemachines import SpeakerSystemStateMachine
 User = get_user_model()
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class WFEffectsTests(TestCase):
     fixtures = ["meeting_test_fixture"]
 
@@ -94,7 +91,6 @@ class WFEffectsTests(TestCase):
         self.assertEqual(SpeakerSystemStateMachine.archived.value, self.system.state)
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class AppStateTests(TestCase):
     fixtures = ["meeting_test_fixture"]
 
@@ -200,7 +196,6 @@ class AppStateTests(TestCase):
         )
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class SendStateChangesTestsTests(TestCase):
     fixtures = ["meeting_test_fixture"]
 
@@ -520,7 +515,6 @@ class SendStateChangesTestsTests(TestCase):
         )
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class RolesRelationsTests(TestCase):
     @classmethod
     def setUpTestData(cls):

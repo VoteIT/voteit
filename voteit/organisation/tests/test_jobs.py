@@ -4,9 +4,7 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.test import TestCase
-from django.test import override_settings
 from django.utils.timezone import now
-from voteit.messaging.testing import testing_channel_layers_setting
 from social_django.models import Code
 from social_django.models import Nonce
 from social_django.models import Partial
@@ -28,7 +26,6 @@ User = get_user_model()
 SIGNALS = "voteit.organisation.signals"
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class JobsTests(TestCase):
     fixtures = ["meeting_test_fixture"]
 
@@ -49,7 +46,6 @@ class JobsTests(TestCase):
         self.assertEqual({"email": "mine@betahaus.net"}, self.usa2.extra_data)
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class LoginMethodAddedTests(TestCase):
     """
     Someone gaining a second way into their account hears about it.
@@ -130,7 +126,6 @@ class LoginMethodAddedTests(TestCase):
         self.assertIn(SCOUTID_PROVIDER, mail.outbox[0].body)
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class CleanupSocialAuthLeftoversTests(TestCase):
     """
     A partial is a paused login holding the provider's tokens. Nothing pruned

@@ -2,11 +2,9 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from django.test import override_settings
 from voteit.messaging.testing import build_app_state
 from voteit.components.messages import MeetingComponentChanged
 from voteit.messaging.testing import payloads_of
-from voteit.messaging.testing import testing_channel_layers_setting
 
 from voteit.active.components import ActiveUsersComponent
 from voteit.core.testing import FakeCommit
@@ -20,7 +18,6 @@ from voteit.meeting.roles import ROLE_MODERATOR
 User = get_user_model()
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class ParticipantsAppStateTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -118,7 +115,6 @@ class ParticipantsAppStateTests(TestCase):
         )
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class MeetingComponentChangedTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -185,7 +181,6 @@ class MeetingComponentChangedTests(TestCase):
         self.assertEqual(component_pk, msg.payload.pk)
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class MeetingComponentsDisabledWhenMeetingClosesTests(TestCase):
     @classmethod
     def setUpTestData(cls):

@@ -32,7 +32,6 @@ from voteit.app.scouterna import SCOUTID_PROVIDER
 from voteit.app.scouterna.backends import SCOUTNET_MEMBER_NO
 from voteit.app.scouterna.testing import scoutid_disabled
 from voteit.app.scouterna.testing import scoutid_enabled
-from voteit.messaging.testing import testing_channel_layers_setting
 from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation import LOGIN_PROVIDER_SESSION_KEY
 from voteit.organisation.models import OAuth2Provider
@@ -912,7 +911,6 @@ class StateMachinesViewTests(TestCase):
         self.assertEqual("review", transitions[0]["to"])
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class UserConnectionsTests(IsolatedCacheMixin, APITestCase):
     """
     Attaching another way of signing in, seeing them, and taking one away.

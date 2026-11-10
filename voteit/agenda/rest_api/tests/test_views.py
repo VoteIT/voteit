@@ -1,10 +1,8 @@
 from django.contrib.auth import get_user_model
 from django.db import connection
 from django.test import RequestFactory
-from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
 from voteit.messaging.testing import ChannelMessageCatcher
-from voteit.messaging.testing import testing_channel_layers_setting
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 from rest_framework.test import APITransactionTestCase
@@ -228,7 +226,6 @@ class AgendaItemStateMachineSchemaTests(APITestCase):
         self.assertIn("events", response.data)
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class AgendaItemBulkChangeViewTests(APITestCase):
     fixtures = ["meeting_test_fixture", "agenda_test_fixture"]
 
@@ -426,7 +423,6 @@ class AgendaItemBulkChangeViewTests(APITestCase):
         self.assertIn("agenda_items", response.json())
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class AgendaItemBulkChangeNoAmbientAtomicTests(APITransactionTestCase):
     """
     Uses APITransactionTestCase (no wrapping test-transaction) to check whether
@@ -494,7 +490,6 @@ class BulkAgendaItemSerializerQueryTests(APITestCase):
         self.assertEqual(query_count_two, query_count_three)
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class AgendaItemBulkDeleteViewTests(APITestCase):
     fixtures = ["meeting_test_fixture", "agenda_test_fixture"]
 

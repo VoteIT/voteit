@@ -1,6 +1,5 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from django.test import override_settings
 
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import Meeting
@@ -8,7 +7,6 @@ from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.messaging.testing import assert_frames_equal
 from voteit.messaging.testing import payloads_of
 from voteit.messaging.testing import run_collector
-from voteit.messaging.testing import testing_channel_layers_setting
 from voteit.messaging.values import wire_field_names
 from voteit.reactions.collectors import button_payloads
 from voteit.reactions.collectors import reaction_payloads
@@ -20,7 +18,6 @@ from voteit.reactions.rest_api.serializers import ReactionSerializer
 User = get_user_model()
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class ReactionWireShapeTests(TestCase):
     """`reactions.buttons` and `reactions.own` build payloads with .values().
 

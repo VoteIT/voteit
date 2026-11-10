@@ -12,7 +12,6 @@ from voteit.core.admin import LinkedFilter
 from voteit.core.admin import OnlineFilter
 from voteit.meeting.models import Meeting
 from voteit.messaging.models import Connection
-from voteit.messaging.testing import testing_channel_layers_setting
 from voteit.organisation.models import Organisation
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
@@ -132,7 +131,6 @@ class OnlineFilterTests(TestCase):
         self.assertEqual({"online", "silent"}, self._usernames(OnlineFilter.ONLINE))
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class LinkedFilterMaybeClearableTests(TestCase):
     changelist_url = reverse("admin:core_user_changelist")
 

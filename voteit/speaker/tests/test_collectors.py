@@ -1,7 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.db import connection
 from django.test import TestCase
-from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
 
 from voteit.meeting.models import Meeting
@@ -12,7 +11,6 @@ from voteit.messaging.testing import assert_frames_equal
 from voteit.messaging.testing import action_of
 from voteit.messaging.testing import payloads_of
 from voteit.messaging.testing import run_collector
-from voteit.messaging.testing import testing_channel_layers_setting
 from voteit.room.channels import RoomChannel
 from voteit.messaging.values import wire_field_names
 from voteit.speaker.collectors import speaker_payloads
@@ -26,7 +24,6 @@ from voteit.speaker.roles import ROLE_SPEAKER
 User = get_user_model()
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class SpeakerWireShapeTests(TestCase):
     """`speaker.changed` payloads are built with .values(), not SpeakerSerializer.
 

@@ -4,7 +4,6 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from django.test import override_settings
 
 from voteit.messaging.testing import build_app_state
 from voteit.messaging.testing import payloads_of
@@ -16,12 +15,8 @@ from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
 
 User = get_user_model()
-_channel_layers_setting = {
-    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
-}
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class SignalsTests(TestCase):
     @classmethod
     def setUpTestData(cls):

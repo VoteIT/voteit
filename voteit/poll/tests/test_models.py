@@ -6,8 +6,6 @@ from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.test import SimpleTestCase
 from django.test import TestCase
-from django.test import override_settings
-from voteit.messaging.testing import testing_channel_layers_setting
 
 from voteit.agenda.models import AgendaItem
 from voteit.meeting.models import Meeting
@@ -547,7 +545,6 @@ class VoteTests(TestCase):
         )
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 @patch.dict(
     vote_transfer_policies,
     {UnrestrictedVoteTransferPolicy.name: UnrestrictedVoteTransferPolicy},

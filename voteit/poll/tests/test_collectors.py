@@ -1,11 +1,9 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from django.test import override_settings
 
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.messaging.testing import assert_frames_equal
-from voteit.messaging.testing import testing_channel_layers_setting
 from voteit.messaging.values import wire_field_names
 from voteit.poll.collectors import vote_transfer_payloads
 from voteit.poll.messages import VoteTransferChanged
@@ -15,7 +13,6 @@ from voteit.poll.rest_api.serializers import VoteTransferSerializer
 User = get_user_model()
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class VoteTransferWireShapeTests(TestCase):
     """`poll.vote_transfers` builds payloads with .values(), not the serializer.
 

@@ -1,6 +1,5 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from django.test import override_settings
 
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.collectors import group_membership_payloads
@@ -18,13 +17,11 @@ from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.messaging.testing import assert_frames_equal
 from voteit.messaging.testing import payloads_of
 from voteit.messaging.testing import run_collector
-from voteit.messaging.testing import testing_channel_layers_setting
 from voteit.messaging.values import wire_field_names
 
 User = get_user_model()
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class MeetingGroupWireShapeTests(TestCase):
     """`meeting.groups` and `meeting.group_roles` build payloads with .values().
 

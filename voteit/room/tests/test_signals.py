@@ -2,7 +2,6 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from django.test import override_settings
 from voteit.messaging.testing import action_of
 from voteit.messaging.testing import build_app_state
 from voteit.messaging.testing import payloads_of
@@ -18,14 +17,9 @@ from voteit.room.messages import RoomDeleted
 from voteit.room.messages import RoomHighlighted
 from voteit.room.models import Room
 
-_channel_layers_setting = {
-    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
-}
-
 User = get_user_model()
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class SubscriptionTests(TestCase):
     @classmethod
     def setUpTestData(cls):

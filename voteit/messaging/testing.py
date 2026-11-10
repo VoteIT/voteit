@@ -24,10 +24,6 @@ if TYPE_CHECKING:
     from voteit.messaging.channels import PubSubChannel
     from voteit.messaging.utils import Target
 
-testing_channel_layers_setting = {
-    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
-}
-
 # Every websocket test has to send this.
 #
 # chanx builds its communicator from get_websocket_application(), which is the
@@ -44,13 +40,12 @@ WS_TEST_ORIGIN_HEADER = (b"origin", b"http://testserver")
 def ws_test_settings(cls_or_func):
     """Settings a consumer test needs.
 
-    An in-memory channel layer, and SEND_COMPLETION on so that
+    SEND_COMPLETION on so that
     ``receive_all_messages()``'s default stop_action works. Production leaves
     completion off, and chanx re-reads its settings on Django's
     setting_changed signal, so overriding per test case is safe.
     """
     return override_settings(
-        CHANNEL_LAYERS=testing_channel_layers_setting,
         CHANX={**settings.CHANX, "SEND_COMPLETION": True},
     )(cls_or_func)
 

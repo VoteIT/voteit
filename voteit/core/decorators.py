@@ -279,3 +279,37 @@ def csrf_exempt_for_origins(
         return csrf_exempt(_wrapped_view)
 
     return decorator
+
+
+def job(queue_name: str):
+    """
+    Like django_rq.job, but the queue is looked up on each .delay() rather than at
+    import. django_rq's binds the connection when the module is imported, which is
+    before the test runner moves RQ_QUEUES off the developer's redis.
+
+    Calling the function itself runs it in-process, as before.
+    """
+
+    def decorator(func):
+        def delay(*args, **kwargs):
+            from django_rq.queues import get_queue
+            from django_rq.queues import get_result_ttl
+
+            # Same keyword arguments as rq's decorator takes out of kwargs.
+            depends_on = kwargs.pop("depends_on", None)
+            job_id = kwargs.pop("job_id", None)
+            at_front = kwargs.pop("at_front", False)
+            return get_queue(queue_name).enqueue_call(
+                func,
+                args=args,
+                kwargs=kwargs,
+                result_ttl=get_result_ttl(queue_name),
+                depends_on=depends_on,
+                job_id=job_id,
+                at_front=at_front,
+            )
+
+        func.delay = func.enqueue = delay
+        return func
+
+    return decorator

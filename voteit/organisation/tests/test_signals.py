@@ -2,7 +2,6 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from django.test import override_settings
 
 from voteit.core.messages.user import InvalidateUserCache
 from voteit.messaging.channels import UserChannel
@@ -12,12 +11,8 @@ from voteit.organisation.channels import OrganisationChannel
 from voteit.organisation.models import Organisation
 
 User = get_user_model()
-_channel_layers_setting = {
-    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
-}
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class OrganisationChangedTests(TestCase):
     def setUp(self):
         self.org = Organisation.objects.create(title="Test org")
@@ -36,7 +31,6 @@ class OrganisationChangedTests(TestCase):
         self.assertEqual(self.org.pk, msg.payload.pk)
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class OrganisationChannelSubscribedTests(TestCase):
     def setUp(self):
         self.org: Organisation = Organisation.objects.create(title="Test org")
@@ -58,7 +52,6 @@ class OrganisationChannelSubscribedTests(TestCase):
         self.assertEqual(payload.model, "organisation")
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class RoleChangesPublishedTests(TestCase):
     @classmethod
     def setUpTestData(cls):

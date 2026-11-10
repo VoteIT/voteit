@@ -3,7 +3,6 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.test import TestCase
-from django.test import override_settings
 
 from voteit.messaging.channels import UserChannel
 from voteit.messaging.testing import action_of
@@ -13,7 +12,6 @@ from voteit.messaging.testing import run_collector
 from voteit.poll.messages import GenericVoteResponse
 from voteit.poll.messages import PollStatus
 from voteit.messaging.testing import ChannelMessageCatcher
-from voteit.messaging.testing import testing_channel_layers_setting
 
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.channels import ModeratorsChannel
@@ -33,7 +31,6 @@ from voteit.poll.testing import UnrestrictedVoteTransferPolicy
 User = get_user_model()
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class MeetingSubscribedTests(TestCase):
     fixtures = ["meeting_test_fixture"]
 
@@ -213,7 +210,6 @@ class MeetingSubscribedTests(TestCase):
         self.assertIn({"pk": self.poll2.pk, "voted": 2, "total": 2}, dict_payloads)
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class PollChangedTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -309,7 +305,6 @@ class PollChangedTests(TestCase):
         self.assertFalse(mock_publish.called)
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class PrivateAIPublishedTests(TestCase):
     def setUp(self):
         self.er = ElectoralRegister.objects.create()
@@ -350,7 +345,6 @@ class PrivateAIPublishedTests(TestCase):
         self.assertEqual(1, len([x for x in messages if isinstance(x, PollChanged)]))
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class NewERSentToMeetingTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -374,7 +368,6 @@ class NewERSentToMeetingTests(TestCase):
         self.assertEqual([{"user": self.user.pk, "weight": 5}], msg.payload.weights)
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class VoteSignalsTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -434,7 +427,6 @@ class VoteSignalsTests(TestCase):
         mock_schedule.assert_called_once_with(self.poll.pk)
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 @patch.dict(
     vote_transfer_policies,
     {UnrestrictedVoteTransferPolicy.name: UnrestrictedVoteTransferPolicy},

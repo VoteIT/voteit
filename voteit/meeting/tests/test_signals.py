@@ -3,11 +3,9 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.dispatch import receiver
 from django.test import TestCase
-from django.test import override_settings
 from voteit.messaging.testing import build_app_state
 from voteit.meeting.messages import GroupRoleChanged
 from voteit.messaging.testing import payloads_of
-from voteit.messaging.testing import testing_channel_layers_setting
 
 from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import GroupRole
@@ -22,7 +20,6 @@ from voteit.poll.app.er_policies.auto_before_poll import AutoBeforePoll
 User = get_user_model()
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class MeetingJoinedSignalTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -66,7 +63,6 @@ class MeetingJoinedSignalTests(TestCase):
             invite.save()
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class MeetingChangedTests(TestCase):
     def setUp(self):
         self.meeting = Meeting.objects.create()
@@ -85,7 +81,6 @@ class MeetingChangedTests(TestCase):
         self.assertEqual(self.meeting.pk, msg.payload.pk)
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class ParticipantsAppStateTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -137,7 +132,6 @@ class ParticipantsAppStateTests(TestCase):
         self.assertEqual(self.meeting.pk, payload.m)
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class MeetingGroupChangedTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -242,7 +236,6 @@ class MeetingGroupChangedTests(TestCase):
         )
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class RoleChangesPublishedTests(TestCase):
     @classmethod
     def setUpTestData(cls):

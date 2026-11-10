@@ -18,7 +18,6 @@ from voteit.messaging.messages import ChannelLeft
 from voteit.messaging.models import ABNORMAL_CLOSURE
 from voteit.messaging.models import NORMAL_CLOSURE
 from voteit.messaging.models import Connection
-from voteit.messaging.testing import testing_channel_layers_setting
 from voteit.organisation.models import Organisation
 
 User = get_user_model()
@@ -101,7 +100,6 @@ class CloseStaleConnectionsTests(TestCase):
         self.assertFalse(Connection.objects.exists())
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class RecheckJobTests(TestCase):
     """The job behind channel.recheck.
 

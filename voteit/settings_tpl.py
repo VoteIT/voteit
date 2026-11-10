@@ -171,6 +171,9 @@ VOTEIT_APP_STATE_BUNDLE_BYTES = int(
     os.getenv("VOTEIT_APP_STATE_BUNDLE_BYTES", 1_000_000)
 )
 
+#: Keeps tests off the real redis, see the runner.
+TEST_RUNNER = "voteit.core.test_runner.VoteITTestRunner"
+
 RQ_QUEUES = {
     "default": {
         "HOST": "redis",

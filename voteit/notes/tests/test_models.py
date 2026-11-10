@@ -1,16 +1,13 @@
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.test import TestCase
-from django.test import override_settings
 
-from voteit.messaging.testing import testing_channel_layers_setting
 
 from voteit.meeting.models import Meeting
 
 User = get_user_model()
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class NotesTests(TestCase):
     fixtures = ["meeting_test_fixture"]
 
