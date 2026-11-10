@@ -20,6 +20,7 @@ from voteit.core.models import RoleContextMixin
 from voteit.core.models import Roles
 from voteit.core.utils import relaxed_clean_html
 from voteit.core.validators import SVGValidator
+from voteit.core.validators import validate_language
 from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation.roles import ROLE_MEETING_CREATOR
 from voteit.organisation.roles import ROLE_ORG_MANAGER
@@ -88,6 +89,7 @@ class OrganisationRoles(OrganisationContext, Roles):
         "host",
         "active",
         "help_info",
+        "default_language",
     ],
 )
 class Organisation(BaseContent, RoleContextMixin, OrganisationContext):
@@ -142,6 +144,14 @@ class Organisation(BaseContent, RoleContextMixin, OrganisationContext):
         blank=True,
         null=True,
     )
+    default_language: str = models.CharField(
+        verbose_name="Language for emails when the recipient's own isn't known",
+        help_text="Blank means the site default.",
+        max_length=10,
+        blank=True,
+        default="",
+        validators=[validate_language],
+    )
 
     class Meta:
         verbose_name = "Organisation"
@@ -152,6 +162,9 @@ class Organisation(BaseContent, RoleContextMixin, OrganisationContext):
     def organisation(self) -> Organisation | None:
         # For OrganisationContext
         return self
+
+    def get_language(self) -> str:
+        return self.default_language or settings.LANGUAGE_CODE
 
     def enabled_components(self):
         for component in self.components.filter(enabled=True):

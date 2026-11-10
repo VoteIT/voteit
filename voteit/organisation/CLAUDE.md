@@ -14,6 +14,11 @@ The root tenant. Key fields:
 - `page_title` — defaults to `title` on first save if left blank.
 - `colors` — JSON validated by `schemas.OrganisationColors`, currently only `appBar` as `{r, g, b}`. Unknown keys are rejected, so a new setting needs adding to the schema.
 - `logo` — SVG, stored at `org_{pk}/logo/{uuid}.svg`. `core.validators.SVGValidator` rejects anything that could run script or load external resources, instead of sanitizing it.
+- `default_language` — language for emails sent where there is no request to go by (the
+  removal confirmation from `RemovalRequestsViewSet.remove`). It's blank by default, and
+  `get_language()` then falls back to `LANGUAGE_CODE`. It's validated against
+  `settings.LANGUAGES` and editable through `change`. It deliberately doesn't affect
+  request language: `LocaleMiddleware` still goes by the client.
 - `providers` — reverse relation to `OAuth2Provider`, one row per configured login method. Use `get_provider(provider_id)` to fetch one.
 
 `enabled_components()` yields `OrganisationComponent` instances where `enabled=True` and `is_valid` is truthy.
@@ -85,7 +90,7 @@ All ViewSets are registered to the central router in `rest_api/views.py`.
 ### `OrganisationViewSet` (`/api/organisation/`)
 
 - `list` — returns the single organisation matching the request's `Host` header. Unauthenticated callers get the org by hostname lookup. Authenticated callers get their own org; if their org's host does not match the request host, a `401 AuthenticationFailed` is raised with the message "You're logged in to another organisation".
-- `change` (`PATCH /api/organisation/change/`) — partial update of `body`, `colors`, `help_info`, `logo` and `page_title`. Requires `org_manager`. `logo` is sent as multipart, `"logo": null` removes it, and is returned as a relative `/media/…` URL so the `organisation.changed` push matches. `colors` replaces the whole object.
+- `change` (`PATCH /api/organisation/change/`) — partial update of `body`, `colors`, `default_language`, `help_info`, `logo` and `page_title`. Requires `org_manager`. `logo` is sent as multipart, `"logo": null` removes it, and is returned as a relative `/media/…` URL so the `organisation.changed` push matches. `colors` replaces the whole object.
 - Create/delete are not supported (405).
 
 The serializer also exposes read-only computed fields: `providers` and `components` (enabled org components via `OrganisationComponentSerializer`).
@@ -124,8 +129,8 @@ Org managers only. `list` / `retrieve` (by user pk) of the organisation's users 
 `remove` (`POST /api/removal-requests/<pk>/remove/`) runs `voteit.core.removal.remove_user`
 on the locked row and responds `{"result": "deleted" | "anonymised"}`. It enforces the same
 rules as `can_remove`: 403 for the manager's own account, 400 before `removable_after`. The
-confirmation email is sent in the manager's request language, since the user's own isn't
-stored. The auth log gets the user's pk only, never their name.
+confirmation email is sent in the organisation's `default_language`, since the user's own
+isn't stored. The auth log gets the user's pk only, never their name.
 
 ### `MatchOrphansViewSet` (`/api/match-orphans/`)
 

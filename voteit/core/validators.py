@@ -3,6 +3,7 @@ import re
 from collections.abc import Iterable
 from typing import Dict
 
+from django.conf import settings
 from django.core import validators
 from django.core.exceptions import ValidationError
 from django.utils.deconstruct import deconstructible
@@ -403,3 +404,15 @@ def ensure_unique(value):
             raise DuplicateItemsError("Items must be unique")
         seen.add(key)
     return value
+
+
+def validate_language(value: str) -> None:
+    """
+    >>> validate_language("sv")
+    >>> validate_language("klingon")
+    Traceback (most recent call last):
+    ...
+    django.core.exceptions.ValidationError: ['Not a supported language: klingon']
+    """
+    if value not in dict(settings.LANGUAGES):
+        raise ValidationError(f"Not a supported language: {value}")

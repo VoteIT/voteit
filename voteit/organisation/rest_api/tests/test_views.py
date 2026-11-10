@@ -49,6 +49,7 @@ class OrganisationViewSetTests(APITestCase):
             "body": "",
             "colors": {},
             "components": [],
+            "default_language": "",
             "help_info": "",
             "logo": None,
             "page_title": "Other org",
@@ -186,6 +187,23 @@ class OrganisationBrandingTests(APITestCase):
             },
             format="multipart",
         )
+
+    def test_default_language(self):
+        self.client.force_login(self.manager)
+        response = self.client.patch(self.url, {"default_language": "sv"})
+        self.assertEqual(200, response.status_code)
+        self.assertEqual("sv", response.json()["default_language"])
+        self.org.refresh_from_db()
+        self.assertEqual("sv", self.org.get_language())
+
+    def test_default_language_invalid(self):
+        self.client.force_login(self.manager)
+        response = self.client.patch(self.url, {"default_language": "klingon"})
+        self.assertEqual(400, response.status_code)
+
+    @override_settings(LANGUAGE_CODE="da")
+    def test_get_language_falls_back_to_site_default(self):
+        self.assertEqual("da", self.org.get_language())
 
     def test_colors(self):
         colors = {"appBar": {"r": 0, "g": 128, "b": 255}}

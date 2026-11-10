@@ -134,6 +134,15 @@ class RemovalRequestsTests(APITestCase):
         self.assertFalse(User.objects.filter(pk=user.pk).exists())
         self.assertEqual(["nobody@voteit.se"], mail.outbox[0].to)
 
+    def test_remove_confirms_in_organisation_language(self):
+        Organisation.objects.filter(pk=1).update(default_language="sv")
+        self.client.force_login(self.org_manager)
+        with patch("voteit.core.removal.send_removal_confirmation") as confirm:
+            self._remove(self.participant)
+        confirm.assert_called_once()
+        self.assertEqual("participant@voteit.se", confirm.call_args.args[0])
+        self.assertEqual("sv", confirm.call_args.args[2])
+
     def test_remove_too_early(self):
         self.client.force_login(self.org_manager)
         response = self._remove(self.moderator)

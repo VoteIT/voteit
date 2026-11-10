@@ -27,6 +27,7 @@ class AuditlogIntegrationTests(TestCase):
                 "active": ["None", "True"],
                 "body": ["None", ""],
                 "help_info": ["None", ""],
+                "default_language": ["None", ""],
                 "host": ["None", "localhost"],
                 "page_title": ["None", "Hello"],
             },

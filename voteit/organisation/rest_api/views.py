@@ -7,7 +7,6 @@ from django.db import models
 from django.db import transaction
 from django.utils.decorators import method_decorator
 from django.utils.timezone import now
-from django.utils.translation import get_language
 from django.utils.translation import gettext as _
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django_filters.rest_framework import DjangoFilterBackend
@@ -509,5 +508,5 @@ class RemovalRequestsViewSet(viewsets.GenericViewSet):
                     _("The user can still abort the request. Try again later.")
                 )
             log_auth("Removed user on request", request=request, for_user=user.pk)
-            result = remove_user(user, get_language())
+            result = remove_user(user, user.organisation.get_language())
         return Response({"result": result})
