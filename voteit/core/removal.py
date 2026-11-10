@@ -37,6 +37,7 @@ from rq.exceptions import NoSuchJobError
 from rq.job import Job
 
 from voteit.core import RQ_LONG_QUEUE
+from voteit.core.sessions import end_user_access
 
 logger = getLogger(__name__)
 
@@ -141,16 +142,13 @@ def email_removal_requested(user_pk: int, requested: str, language: str):
         organisation = user.organisation
         if organisation is None:
             return
+        email, context = user.email, _confirmation_context(user)
         if get_removal_report(user).classification == NO_ACTIVITY and _delete_user(
             user
         ):
-            email = user.email
-            context = {
-                "full_name": user.get_full_name() or user.userid or user.username,
-                "org_title": organisation.title,
-            }
+            transaction.on_commit(lambda: end_user_access(user_pk))
             transaction.on_commit(
-                lambda: _after_removal(user_pk, email, context, language)
+                lambda: send_removal_confirmation(email, context, language)
             )
             return f"Removed user {user_pk}"
     if not user.email:
@@ -190,13 +188,40 @@ def _delete_user(user) -> bool:
     return True
 
 
-def _after_removal(user_pk: int, email: str, context: dict, language: str) -> None:
-    from voteit.core.sessions import end_tracked_sessions
-    from voteit.messaging.close import close_user_connections
-    from voteit.messaging.models import LOGGED_OUT_EVERYWHERE
+DELETED = "deleted"
+ANONYMISED = "anonymised"
 
-    end_tracked_sessions(user_pk)
-    close_user_connections(user_pk, code=LOGGED_OUT_EVERYWHERE, flush_session=True)
+
+def remove_user(user, language: str) -> str:
+    """
+    Remove a user who asked for it: deleted when nothing references them,
+    anonymised otherwise. Returns DELETED or ANONYMISED.
+
+    Run in a transaction with the row locked. The confirmation goes out after
+    commit, in ``language``.
+    """
+    from voteit.core.anonymise import anonymise_user
+
+    user_pk = user.pk
+    email, context = user.email, _confirmation_context(user)
+    if get_removal_report(user).classification == NO_ACTIVITY and _delete_user(user):
+        transaction.on_commit(lambda: end_user_access(user_pk))
+        result = DELETED
+    else:
+        anonymise_user(user)
+        result = ANONYMISED
+    transaction.on_commit(lambda: send_removal_confirmation(email, context, language))
+    return result
+
+
+def _confirmation_context(user) -> dict:
+    return {
+        "full_name": user.get_full_name() or user.userid or user.username,
+        "org_title": user.organisation.title,
+    }
+
+
+def send_removal_confirmation(email: str, context: dict, language: str) -> None:
     if not email:
         return
     with translation.override(language):

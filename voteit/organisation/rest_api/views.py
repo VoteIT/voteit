@@ -7,6 +7,7 @@ from django.db import models
 from django.db import transaction
 from django.utils.decorators import method_decorator
 from django.utils.timezone import now
+from django.utils.translation import get_language
 from django.utils.translation import gettext as _
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django_filters.rest_framework import DjangoFilterBackend
@@ -28,7 +29,10 @@ from social_django.utils import load_strategy
 from voteit.core import PERM
 from voteit.core.loggers import log_roles_change
 from voteit.core.loggers import notification_logger
+from voteit.core.loggers import log_auth
 from voteit.core.removal import get_removal_report
+from voteit.core.removal import removable_after
+from voteit.core.removal import remove_user
 from voteit.core.rest_api import router
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.core.rest_api.permissions import HasIDProxyAPIKey
@@ -470,8 +474,9 @@ class RemovalRequestsViewSet(viewsets.GenericViewSet):
         return [IsOrgManager()]
 
     def get_queryset(self):
+        # Anonymised users are done with, though the request stays on the row.
         return self.request.user.organisation.users.filter(
-            removal_requested__isnull=False
+            removal_requested__isnull=False, anonymised__isnull=True
         ).order_by("removal_requested", "pk")
 
     def list(self, request):
@@ -481,3 +486,28 @@ class RemovalRequestsViewSet(viewsets.GenericViewSet):
     def retrieve(self, request, pk=None):
         user = get_object_or_404(self.get_queryset(), pk=pk)
         return Response(self.get_serializer(get_removal_report(user)).data)
+
+    @action(methods=["POST"], detail=True)
+    def remove(self, request, pk=None):
+        """
+        POST /api/removal-requests/<pk>/remove/ -- delete the user if nothing
+        references them, anonymise otherwise. Responds with
+        ``{"result": "deleted" | "anonymised"}``.
+
+        Same rules as ``can_remove``: the wait must have passed, and nobody
+        removes themselves.
+        """
+        with transaction.atomic():
+            # Locked so an abort can't land between the checks and the removal.
+            user = get_object_or_404(
+                self.get_queryset().select_for_update(of=("self",)), pk=pk
+            )
+            if user.pk == request.user.pk:
+                raise exceptions.PermissionDenied(_("You can't remove yourself."))
+            if now() < removable_after(user):
+                raise ValidationError(
+                    _("The user can still abort the request. Try again later.")
+                )
+            log_auth("Removed user on request", request=request, for_user=user.pk)
+            result = remove_user(user, get_language())
+        return Response({"result": result})

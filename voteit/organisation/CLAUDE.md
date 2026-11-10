@@ -115,12 +115,17 @@ Read-only `list` / `retrieve` of every `GlobalTermsOfService` with `required_fro
 ### `RemovalRequestsViewSet` (`/api/removal-requests/`)
 
 Org managers only. `list` / `retrieve` (by user pk) of the organisation's users with
-`removal_requested` set, oldest first, each with a `voteit.core.removal.get_removal_report`:
+`removal_requested` set and not yet anonymised, oldest first, each with a `voteit.core.removal.get_removal_report`:
 `classification`, `organisation_roles`, per-meeting `meetings` (roles, `used_invite`,
 `groups`, counts of `proposals`, `discussion_posts`, `votes`,
 `speaker_entries` and `ongoing_polls`) and `removable_after`. `can_remove` is false until
-`removable_after` has passed, and always false for the manager's own account. Read-only for
-now. The removal itself comes later, and must enforce the same rules.
+`removable_after` has passed, and always false for the manager's own account.
+
+`remove` (`POST /api/removal-requests/<pk>/remove/`) runs `voteit.core.removal.remove_user`
+on the locked row and responds `{"result": "deleted" | "anonymised"}`. It enforces the same
+rules as `can_remove`: 403 for the manager's own account, 400 before `removable_after`. The
+confirmation email is sent in the manager's request language, since the user's own isn't
+stored. The auth log gets the user's pk only, never their name.
 
 ### `MatchOrphansViewSet` (`/api/match-orphans/`)
 

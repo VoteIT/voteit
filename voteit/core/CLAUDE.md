@@ -115,6 +115,13 @@ sessions) and emails a removal confirmation. A delete blocked by `RESTRICT` (con
 report can't place, like a post without an agenda item) is logged, and the regular abort
 email goes out instead.
 
+`remove_user(user, language)` is the manager's removal (see `RemovalRequestsViewSet.remove`
+in `voteit.organisation`). It deletes the user when the report says `no_activity` and the
+delete isn't blocked, and calls `anonymise_user` otherwise. Either way it ends access and
+sends the removal confirmation after commit. The caller holds the row lock.
+`end_user_access(user_pk)` (`sessions.py`) is the shared "log out everywhere" for code
+running outside the user's own request.
+
 Logging in to an account with a pending request is stopped by the
 `stop_if_removal_requested` pipeline step, which redirects to the same abort page
 with a fresh token (`abort_removal_path`).

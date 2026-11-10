@@ -80,3 +80,15 @@ def end_tracked_sessions(user_pk: int) -> int:
         _session_store(session_key).delete()
     cache.delete(cache_key(user_pk))
     return len(keys)
+
+
+def end_user_access(user_pk: int) -> None:
+    """
+    Log a user out everywhere from outside their own requests: end tracked
+    sessions and close sockets, which flush the sessions behind them.
+    """
+    from voteit.messaging.close import close_user_connections
+    from voteit.messaging.models import LOGGED_OUT_EVERYWHERE
+
+    end_tracked_sessions(user_pk)
+    close_user_connections(user_pk, code=LOGGED_OUT_EVERYWHERE, flush_session=True)

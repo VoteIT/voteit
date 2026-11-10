@@ -1,6 +1,8 @@
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core import mail
 from django.test import override_settings
 from django.urls import reverse
 from django.utils.timezone import now
@@ -93,3 +95,73 @@ class RemovalRequestsTests(APITestCase):
     def test_anonymous(self):
         response = self.client.get(reverse("removal-requests-list"))
         self.assertIn(response.status_code, (401, 403))
+
+    def _remove(self, user):
+        with (
+            patch("voteit.core.sessions.end_tracked_sessions"),
+            patch("voteit.messaging.close.close_user_connections"),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            return self.client.post(
+                reverse("removal-requests-remove", kwargs={"pk": user.pk})
+            )
+
+    def test_remove_anonymises_active_user(self):
+        self.client.force_login(self.org_manager)
+        response = self._remove(self.participant)
+        self.assertEqual(200, response.status_code)
+        self.assertEqual({"result": "anonymised"}, response.json())
+        self.participant.refresh_from_db()
+        self.assertIsNotNone(self.participant.anonymised)
+        self.assertEqual("", self.participant.email)
+        # Confirmation went to the address it had
+        self.assertEqual(["participant@voteit.se"], mail.outbox[0].to)
+        # Done with, so off the list
+        response = self.client.get(reverse("removal-requests-list"))
+        self.assertEqual(
+            [self.moderator.pk], [item["user"]["pk"] for item in response.json()]
+        )
+
+    def test_remove_deletes_user_without_activity(self):
+        user = Organisation.objects.get(pk=1).users.create(
+            username="nobody",
+            email="nobody@voteit.se",
+            removal_requested=now() - timedelta(hours=4),
+        )
+        self.client.force_login(self.org_manager)
+        response = self._remove(user)
+        self.assertEqual({"result": "deleted"}, response.json())
+        self.assertFalse(User.objects.filter(pk=user.pk).exists())
+        self.assertEqual(["nobody@voteit.se"], mail.outbox[0].to)
+
+    def test_remove_too_early(self):
+        self.client.force_login(self.org_manager)
+        response = self._remove(self.moderator)
+        self.assertEqual(400, response.status_code)
+        self.moderator.refresh_from_db()
+        self.assertIsNone(self.moderator.anonymised)
+        self.assertEqual([], mail.outbox)
+
+    def test_remove_self(self):
+        self.org_manager.removal_requested = now() - timedelta(days=1)
+        self.org_manager.save()
+        self.client.force_login(self.org_manager)
+        response = self._remove(self.org_manager)
+        self.assertEqual(403, response.status_code)
+        self.org_manager.refresh_from_db()
+        self.assertIsNone(self.org_manager.anonymised)
+
+    def test_remove_without_request(self):
+        self.participant.removal_requested = None
+        self.participant.save()
+        self.client.force_login(self.org_manager)
+        self.assertEqual(404, self._remove(self.participant).status_code)
+
+    def test_remove_other_organisation(self):
+        self.client.force_login(self.org_manager)
+        other = User.objects.get(username="elsewhere")
+        self.assertEqual(404, self._remove(other).status_code)
+
+    def test_remove_not_manager(self):
+        self.client.force_login(self.moderator)
+        self.assertEqual(403, self._remove(self.participant).status_code)

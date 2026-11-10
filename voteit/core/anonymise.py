@@ -13,6 +13,8 @@ from logging import getLogger
 from django.db import transaction
 from django.utils.timezone import now
 
+from voteit.core.sessions import end_user_access
+
 logger = getLogger(__name__)
 
 
@@ -48,14 +50,5 @@ def anonymise_user(user) -> None:
     if image_name:
         storage = user._meta.get_field("image").storage
         transaction.on_commit(lambda: storage.delete(image_name))
-    transaction.on_commit(lambda: _end_access(user.pk))
+    transaction.on_commit(lambda: end_user_access(user.pk))
     logger.info("Anonymised user %s", user.pk)
-
-
-def _end_access(user_pk: int) -> None:
-    from voteit.core.sessions import end_tracked_sessions
-    from voteit.messaging.close import close_user_connections
-    from voteit.messaging.models import LOGGED_OUT_EVERYWHERE
-
-    end_tracked_sessions(user_pk)
-    close_user_connections(user_pk, code=LOGGED_OUT_EVERYWHERE, flush_session=True)
