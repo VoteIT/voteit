@@ -4,6 +4,8 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.test import override_settings
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils.timezone import now
 from rest_framework.test import APITestCase
@@ -56,12 +58,28 @@ class RemovalRequestsTests(APITestCase):
                     "speaker_entries": 0,
                     "proposals": 0,
                     "discussion_posts": 0,
+                    "vote_transfers": 0,
+                    "reactions": 0,
                 }
             ],
             participant["meetings"],
         )
         # Too early
         self.assertFalse(moderator["can_remove"])
+
+    def test_list_queries_dont_grow_with_requests(self):
+        self.client.force_login(self.org_manager)
+        url = reverse("removal-requests-list")
+        with CaptureQueriesContext(connection) as before:
+            self.client.get(url)
+        for i in range(3):
+            self.org_manager.organisation.users.create(
+                username=f"leaving{i}", removal_requested=now()
+            )
+        with CaptureQueriesContext(connection) as after:
+            response = self.client.get(url)
+        self.assertEqual(5, len(response.json()))
+        self.assertEqual(len(before), len(after))
 
     def test_retrieve(self):
         self.client.force_login(self.org_manager)

@@ -30,6 +30,7 @@ from voteit.core.loggers import log_roles_change
 from voteit.core.loggers import notification_logger
 from voteit.core.loggers import log_auth
 from voteit.core.removal import get_removal_report
+from voteit.core.removal import get_removal_reports
 from voteit.core.removal import removable_after
 from voteit.core.removal import remove_user
 from voteit.core.rest_api import router
@@ -479,7 +480,7 @@ class RemovalRequestsViewSet(viewsets.GenericViewSet):
         ).order_by("removal_requested", "pk")
 
     def list(self, request):
-        reports = [get_removal_report(user) for user in self.get_queryset()]
+        reports = get_removal_reports(self.get_queryset())
         return Response(self.get_serializer(reports, many=True).data)
 
     def retrieve(self, request, pk=None):

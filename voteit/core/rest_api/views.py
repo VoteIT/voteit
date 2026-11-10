@@ -228,6 +228,7 @@ class UserView(
                 transaction.on_commit(lambda: schedule_removal_email(user, language))
         elif user.removal_requested is not None:
             _abort_removal(user)
+            user.removal_requested = None
         return Response(UserAndRolesSerializer(user, context={"request": request}).data)
 
     @action(
@@ -245,7 +246,8 @@ class UserView(
         """
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        _abort_removal(serializer.validated_data["token"])
+        if not _abort_removal(serializer.validated_data["token"]):
+            raise ValidationError({"token": [AbortRemovalSerializer.invalid_message]})
         return Response({"message": _("The removal of your account was aborted.")})
 
     @action(methods=["POST"], detail=True)
@@ -357,10 +359,28 @@ class UserView(
         return Response(data=serializer.data)
 
 
-def _abort_removal(user) -> None:
-    user.removal_requested = None
-    user.save(update_fields=["removal_requested"])
-    transaction.on_commit(lambda: cancel_removal_email(user.pk))
+def _abort_removal(user) -> bool:
+    """
+    False if the request was removed or replaced since ``user`` was read. The
+    removal job and the manager's removal hold the row lock while they work.
+    """
+    with transaction.atomic():
+        locked = (
+            get_user_model()
+            .objects.select_for_update()
+            .filter(
+                pk=user.pk,
+                removal_requested=user.removal_requested,
+                anonymised__isnull=True,
+            )
+            .first()
+        )
+        if locked is None:
+            return False
+        locked.removal_requested = None
+        locked.save(update_fields=["removal_requested"])
+        transaction.on_commit(lambda: cancel_removal_email(user.pk))
+    return True
 
 
 @router.register("health", basename="health")

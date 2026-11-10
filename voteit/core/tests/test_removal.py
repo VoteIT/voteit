@@ -19,14 +19,19 @@ from voteit.core.removal import ONGOING_POLL
 from voteit.core.removal import ORGANISATION_ROLES
 from voteit.core.removal import email_removal_requested
 from voteit.core.removal import get_removal_report
+from voteit.core.removal import get_removal_reports
 from voteit.core.removal import get_user_from_abort_token
 from voteit.core.removal import make_abort_token
 from voteit.core.removal import schedule_removal_email
+from voteit.core.rest_api.views import _abort_removal
 from voteit.discussion.models import DiscussionPost
 from voteit.invites.models import MeetingInvite
 from voteit.meeting.models import Meeting
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Vote
+from voteit.poll.models import VoteTransfer
+from voteit.reactions.models import Reaction
+from voteit.reactions.models import ReactionButton
 
 User = get_user_model()
 VIEWS = "voteit.core.rest_api.views"
@@ -119,6 +124,12 @@ class EmailJobTests(RemovalTestMixin, TestCase):
         self.user.save()
         self._run()
         self.assertEqual([], mail.outbox)
+
+    def test_no_organisation(self):
+        self.user.organisation = None
+        self.user.save()
+        with self.assertRaises(ValueError):
+            self._run()
 
 
 class RemoveInactiveUserTests(TestCase):
@@ -254,6 +265,27 @@ class RemovalAPITests(RemovalTestMixin, APITestCase):
         response = self.client.post(reverse("user-abort-removal"), {"token": token})
         self.assertEqual(400, response.status_code)
 
+    def test_abort_after_anonymised(self):
+        self.user.removal_requested = now()
+        self.user.save()
+        token = make_abort_token(self.user)
+        User.objects.filter(pk=self.user.pk).update(anonymised=now())
+        response = self.client.post(reverse("user-abort-removal"), {"token": token})
+        self.assertEqual(400, response.status_code)
+        self.assertIn("token", response.json())
+        self.user.refresh_from_db()
+        self.assertIsNotNone(self.user.removal_requested)
+
+    def test_abort_loses_race(self):
+        """The user was read before the job or a manager got the lock."""
+        self.user.removal_requested = now()
+        self.user.save()
+        stale = User.objects.get(pk=self.user.pk)
+        User.objects.filter(pk=self.user.pk).update(anonymised=now())
+        self.assertFalse(_abort_removal(stale))
+        User.objects.filter(pk=self.user.pk).delete()
+        self.assertFalse(_abort_removal(stale))
+
     def test_abort_bad_token(self):
         response = self.client.post(reverse("user-abort-removal"), {"token": "x"})
         self.assertEqual(400, response.status_code)
@@ -350,7 +382,7 @@ class RemovalReportTests(TestCase):
             method_name="simple", electoral_register=er, state="closed"
         )
         Vote.objects.create(user=self.participant, poll=poll, abstain=True)
-        with self.assertNumQueries(10):
+        with self.assertNumQueries(12):
             report = get_removal_report(self.participant)
         meeting = report.meetings[0]
         self.assertEqual(["Board"], meeting.groups)
@@ -370,6 +402,51 @@ class RemovalReportTests(TestCase):
         report = get_removal_report(user)
         self.assertEqual(INACTIVE_MEETINGS, report.classification)
         self.assertEqual(1, report.meetings[0].discussion_posts)
+
+    def _bystander(self, username):
+        user = self.meeting.organisation.users.create(
+            username=username, removal_requested=now()
+        )
+        self._set_meeting_state("closed")
+        return user
+
+    def test_vote_transfer(self):
+        self._set_meeting_state("closed")
+        moderator = User.objects.get(username="moderator")
+        VoteTransfer.objects.create(
+            meeting=self.meeting, source=moderator, target=self.participant
+        )
+        for user in (self.participant, moderator):
+            user.removal_requested = now()
+        reports = get_removal_reports([self.participant, moderator])
+        self.assertEqual(
+            [1, 1], [report.meetings[0].vote_transfers for report in reports]
+        )
+
+    def test_reaction(self):
+        user = self._bystander("reacting")
+        ai = self.meeting.agenda_items.create()
+        post = ai.discussions.create()
+        button = ReactionButton.objects.create(
+            title="Like", icon="thumb_up", color="success", meeting=self.meeting
+        )
+        Reaction.objects.create(object=post, button=button, user=user, agenda_item=ai)
+        report = get_removal_report(user)
+        self.assertEqual(INACTIVE_MEETINGS, report.classification)
+        self.assertEqual(1, report.meetings[0].reactions)
+
+    def test_reports_keep_users_apart(self):
+        nobody = self.meeting.organisation.users.create(
+            username="nobody", removal_requested=now()
+        )
+        er = ElectoralRegister.objects.create(meeting=self.meeting)
+        er.set_voters_from_dict({self.participant.pk: 1})
+        self.meeting.polls.create(
+            method_name="simple", electoral_register=er, state="ongoing"
+        )
+        participant, nobody = get_removal_reports([self.participant, nobody])
+        self.assertEqual(ONGOING_POLL, participant.classification)
+        self.assertEqual(NO_ACTIVITY, nobody.classification)
 
     @override_settings(REMOVAL_WAIT_HOURS=5)
     def test_removable_after(self):

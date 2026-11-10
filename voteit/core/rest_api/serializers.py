@@ -11,6 +11,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _lazy
 from pydantic.main import BaseModel
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
@@ -293,17 +294,15 @@ class RequestRemovalSerializer(serializers.Serializer):
 
 class AbortRemovalSerializer(serializers.Serializer):
     token = serializers.CharField(help_text="The token from the removal email.")
+    invalid_message = _lazy(
+        "This link is no longer valid. The removal may already have been aborted."
+    )
 
     def validate_token(self, value: str):
         """Returns the user."""
         user = get_user_from_abort_token(value)
         if user is None:
-            raise ValidationError(
-                _(
-                    "This link is no longer valid. The removal may already "
-                    "have been aborted."
-                )
-            )
+            raise ValidationError(self.invalid_message)
         return user
 
 

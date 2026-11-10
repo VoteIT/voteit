@@ -120,10 +120,12 @@ Read-only `list` / `retrieve` of every `GlobalTermsOfService` with `required_fro
 ### `RemovalRequestsViewSet` (`/api/removal-requests/`)
 
 Org managers only. `list` / `retrieve` (by user pk) of the organisation's users with
-`removal_requested` set and not yet anonymised, oldest first, each with a `voteit.core.removal.get_removal_report`:
-`classification`, `organisation_roles`, per-meeting `meetings` (roles, `used_invite`,
-`groups`, counts of `proposals`, `discussion_posts`, `votes`,
-`speaker_entries` and `ongoing_polls`) and `removable_after`. `can_remove` is false until
+`removal_requested` set and not yet anonymised, oldest first, each with a report from
+`voteit.core.removal.get_removal_reports` (batched, so `list` costs the same for any
+number of requests): `classification`, `organisation_roles`, per-meeting `meetings` (roles,
+`used_invite`, `groups`, counts of `proposals`, `discussion_posts`,
+`votes`, `speaker_entries`, `ongoing_polls`, `vote_transfers` and `reactions`) and
+`removable_after`. `can_remove` is false until
 `removable_after` has passed, and always false for the manager's own account.
 
 `remove` (`POST /api/removal-requests/<pk>/remove/`) runs `voteit.core.removal.remove_user`

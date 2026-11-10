@@ -105,7 +105,10 @@ Cancelling the job on abort is therefore only tidiness, and a failed cancel can'
 stale email. Requesting again while a request stands keeps the original time and sends nothing.
 
 When the job runs on a user whose report says `no_activity`, it deletes the user instead.
-It holds a row lock, so an abort can't slip in between the check and the delete. After
+It holds a row lock, so an abort can't slip in between the check and the delete. The abort
+takes the same lock and only clears the request it was given, on a row that isn't
+anonymised, so losing that race is a 400 rather than a 500 or a false success. A user
+without an organisation can't be emailed and makes the job raise. After
 commit it ends tracked sessions, closes sockets (`LOGGED_OUT_EVERYWHERE`, flushing
 sessions) and emails a removal confirmation. A delete blocked by `RESTRICT` (content the
 report can't place, like a post without an agenda item) is logged, and the regular abort
@@ -128,12 +131,13 @@ Logging in to an account with a pending request is stopped by the
 `stop_if_removal_requested` pipeline step, which redirects to the same abort page
 with a fresh token (`abort_removal_path`).
 
-`get_removal_report(user)` gathers what removing a user would affect, for org managers
+`get_removal_reports(users)` (`get_removal_report(user)` for one) gathers what removing a user would affect, for org managers
 (`/api/removal-requests/`, `voteit.organisation`). It lists it explicitly rather than as a
 score, because managers can't read a number. Per meeting, it reports roles, used invite,
-group titles, and counts of proposals, discussion posts, votes, speaker entries and
-ongoing polls the user can vote in. It costs 10 queries,
-whatever the volume.
+group titles, and counts of proposals, discussion posts, votes, speaker entries,
+ongoing polls the user can vote in, vote transfers (given or received) and reactions.
+Vote transfers and reactions cascade on delete, so they are there to keep such a user
+out of `no_activity`. It costs 12 queries for any number of users.
 
 A meeting is listed if any of these touch it, so content outlives removed roles.
 `classification`, least to most in need of care: `no_activity` (nothing listed, left for a

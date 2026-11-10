@@ -274,6 +274,10 @@ class MeetingInvolvementSerializer(serializers.Serializer):
     )
     proposals = serializers.IntegerField()
     discussion_posts = serializers.IntegerField()
+    vote_transfers = serializers.IntegerField(
+        help_text="Vote transfers the user gives or receives."
+    )
+    reactions = serializers.IntegerField()
 
 
 class RemovalRequestSerializer(serializers.Serializer):
