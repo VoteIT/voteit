@@ -149,13 +149,15 @@ time plus `REMOVAL_WAIT_HOURS` (default 3), which gives the owner time to abort.
 ## Anonymising (`anonymise.py`)
 
 `anonymise_user(user)` is for users who can't be deleted. It keeps the pk and every
-reference to the row (roles, content, votes, invites' `used_by`) and blanks what
+reference to the row (roles, content, invites' `used_by`) and blanks what
 identifies the person:
 - On the row: names, email, `userid`, `identity_id`, `img_url` and `image` (the file is
   deleted after commit). `username` becomes `removed-<pk>`, since it's unique and
   required. The password becomes unusable, and `is_active` / `is_staff` /
   `is_superuser` are cleared. `last_login` is kept. `anonymised` is set.
 - `user_data` on invites they used is emptied.
+- Votes are deleted. Closed polls keep their ballots and result on the poll, so
+  nothing changes there; ongoing polls get their status (vote count) republished.
 - Login methods are deleted. They hold the provider's uid, tokens and verified
   addresses, and would otherwise lead a new login back to this row.
 - After commit, tracked sessions end and sockets close with `LOGGED_OUT_EVERYWHERE`.

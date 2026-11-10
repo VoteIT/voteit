@@ -9,6 +9,8 @@ from django.test import override_settings
 from voteit.core.anonymise import anonymise_user
 from voteit.invites.models import MeetingInvite
 from voteit.meeting.models import Meeting
+from voteit.poll.models import ElectoralRegister
+from voteit.poll.models import Vote
 
 User = get_user_model()
 
@@ -101,3 +103,19 @@ class AnonymiseUserTests(TestCase):
                 self._run()
                 self.assertFalse(storage.exists(name))
                 self.assertFalse(self.user.image)
+
+    def test_deletes_votes(self):
+        er = ElectoralRegister.objects.create(meeting=self.meeting)
+        er.set_voters_from_dict({self.user.pk: 1})
+        closed = self.meeting.polls.create(
+            method_name="simple", electoral_register=er, state="closed"
+        )
+        ongoing = self.meeting.polls.create(
+            method_name="simple", electoral_register=er, state="ongoing"
+        )
+        for poll in (closed, ongoing):
+            Vote.objects.create(user=self.user, poll=poll, abstain=True)
+        with patch("voteit.poll.jobs.schedule_poll_status_publish") as publish:
+            self._run()
+        self.assertFalse(Vote.objects.filter(user=self.user).exists())
+        publish.assert_called_once_with(ongoing.pk)

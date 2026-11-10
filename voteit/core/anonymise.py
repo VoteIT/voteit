@@ -1,7 +1,7 @@
 """
 Blank a user's personal data without deleting the row.
 
-For users who can't simply be deleted because content, votes or roles reference
+For users who can't simply be deleted because content or roles reference
 them. Every reference and the pk stay, so meeting records stay intact; what
 identifies the person goes.
 """
@@ -21,10 +21,14 @@ logger = getLogger(__name__)
 @transaction.atomic
 def anonymise_user(user) -> None:
     """
-    Blank the user row and the identity data of invites they used, and remove
-    their login methods so nobody can get into the account again.
+    Blank the user row and the identity data of invites they used, delete their
+    votes, and remove their login methods so nobody can get into the account
+    again.
     """
     from voteit.invites.models import MeetingInvite
+    from voteit.poll.jobs import schedule_poll_status_publish
+    from voteit.poll.models import Vote
+    from voteit.poll.statemachines import PollStateMachine
 
     image_name = user.image.name if user.image else None
     user.first_name = ""
@@ -45,6 +49,19 @@ def anonymise_user(user) -> None:
     for invite in MeetingInvite.objects.filter(used_by=user).exclude(user_data={}):
         invite.user_data = {}
         invite.save(update_fields=["user_data", "modified"])
+    # Closed polls keep their ballots and result on the poll, so only ongoing
+    # ones change -- their vote count needs publishing.
+    votes = Vote.objects.filter(user=user)
+    ongoing_poll_pks = set(
+        votes.filter(poll__state=PollStateMachine.ongoing.value).values_list(
+            "poll_id", flat=True
+        )
+    )
+    votes.delete()
+    for poll_pk in ongoing_poll_pks:
+        transaction.on_commit(
+            lambda poll_pk=poll_pk: schedule_poll_status_publish(poll_pk)
+        )
     # Holds the provider's uid, tokens and verified addresses.
     user.social_auth.all().delete()
     if image_name:
