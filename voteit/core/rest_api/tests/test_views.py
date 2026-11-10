@@ -309,6 +309,7 @@ class UserViewSetTests(IsolatedCacheMixin, APITestCase):
                 # Only the requesting user's own
                 "member_ids": None,
                 "removal_requested": None,
+                "anonymised": None,
             },
             data[0],
         )
@@ -338,6 +339,7 @@ class UserViewSetTests(IsolatedCacheMixin, APITestCase):
                 "login_provider": IDPROXY_PROVIDER,
                 "member_ids": [],
                 "removal_requested": None,
+                "anonymised": None,
             },
             data,
         )

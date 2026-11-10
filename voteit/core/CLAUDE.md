@@ -59,6 +59,7 @@ All methods silently return an empty result for anonymous (unauthenticated) user
 - `identity_id` — opaque string used to link accounts across organisations (e.g. for SSO)
 - `img_url` — external profile image URL
 - `image` — uploaded profile image (stored at `org_{org_id}/images/{uuid}.{ext}`)
+- `anonymised` — when `anonymise.anonymise_user` blanked the row, or null. Exposed read-only on `UserSerializer` / `UserListSerializer`; the frontend renders a "removed user" label for it
 - `removal_requested` — GDPR: when the user asked to be removed, or null. Set by the user via `POST /api/user/request-removal/` (no body), cleared by aborting with the token from the email (`POST /api/user/abort-removal/`)
 
 `userid` uniqueness is enforced per organisation via a `UniqueConstraint`. The `UserIDValidator` restricts charset to `[a-z0-9-_]`.
@@ -131,6 +132,24 @@ future job), `inactive_meetings`, `active_meeting` (upcoming or ongoing),
 `ongoing_poll` (in the electoral register of an ongoing poll), `organisation_roles`
 (trumps the rest: it changes who runs the organisation). `removable_after` is the request
 time plus `REMOVAL_WAIT_HOURS` (default 3), which gives the owner time to abort.
+
+## Anonymising (`anonymise.py`)
+
+`anonymise_user(user)` is for users who can't be deleted. It keeps the pk and every
+reference to the row (roles, content, votes, invites' `used_by`) and blanks what
+identifies the person:
+- On the row: names, email, `userid`, `identity_id`, `img_url` and `image` (the file is
+  deleted after commit). `username` becomes `removed-<pk>`, since it's unique and
+  required. The password becomes unusable, and `is_active` / `is_staff` /
+  `is_superuser` are cleared. `last_login` is kept. `anonymised` is set.
+- `user_data` on invites they used is emptied.
+- Login methods are deleted. They hold the provider's uid, tokens and verified
+  addresses, and would otherwise lead a new login back to this row.
+- After commit, tracked sessions end and sockets close with `LOGGED_OUT_EVERYWHERE`.
+
+Auditlog is left alone: the saves are logged as usual, and existing entries are kept.
+Since `User` is logged on names and email, its log entries still hold the old values.
+Purging those is left to a later job.
 
 ## Registry Pattern (`component.py`)
 

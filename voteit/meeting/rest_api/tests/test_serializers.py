@@ -232,6 +232,7 @@ class MeetingRolesSerializerTests(TestCase):
                 "last_name": "",
                 "img_url": None,
                 "image": None,
+                "anonymised": None,
             },
             dict(data["user"]),
         )

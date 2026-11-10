@@ -103,6 +103,9 @@ class User(AbstractUser):
     )
     # GDPR: when the user asked to have their data removed. Null means no request.
     removal_requested: datetime | None = models.DateTimeField(blank=True, null=True)
+    # When personal data was blanked by voteit.core.anonymise. The row stays for
+    # everything that references it.
+    anonymised: datetime | None = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         constraints = [

@@ -171,6 +171,7 @@ class UserListSerializer(serializers.ModelSerializer):
             "userid",
             "first_name",
             "last_name",
+            "anonymised",
         )
 
 
@@ -181,6 +182,7 @@ class UserSerializer(serializers.ModelSerializer):
             "pk",
             "img_url",
             "organisation",
+            "anonymised",
         )
         fields = read_only_fields + (
             "userid",
