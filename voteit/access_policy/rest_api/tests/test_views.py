@@ -38,7 +38,7 @@ class AutomaticAccessAPITests(APITestCase):
             url=url,
             data=data,
             method="post",
-            expected=[[None, 401], [self.moderator, 201], [self.participant, 403]],
+            expected=[[None, 403], [self.moderator, 201], [self.participant, 403]],
         ):
             func(*args)
 

@@ -54,7 +54,7 @@ class RoomsViewTestCase(APITestCase):
             "meeting": self.meeting.pk,
         }
         for user, status in (
-            (None, 401),
+            (None, 403),
             (self.moderator, 201),
             (self.participant, 403),
         ):
@@ -83,7 +83,7 @@ class RoomsViewTestCase(APITestCase):
             "meeting": self.meeting.pk,
         }
         response = self.client.get(url, data)
-        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.status_code, 403)
 
     def test_list_outsider(self):
         url = reverse("rooms-list")
@@ -315,7 +315,7 @@ class RoomsViewTestCase(APITestCase):
     def test_mark_text_anon(self):
         url = reverse("rooms-mark-text", kwargs={"pk": self.room.pk})
         response = self.client.post(url, {})
-        self.assertEqual(401, response.status_code)
+        self.assertEqual(403, response.status_code)
 
     def test_mark_text_participant_forbidden(self):
         url = reverse("rooms-mark-text", kwargs={"pk": self.room.pk})

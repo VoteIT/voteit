@@ -135,7 +135,7 @@ def run_permission_tests(
             data={'whatever': 1},
             method="POST",
             expected=[
-                [None, 401],
+                [None, 403],
                 [self.participant, 403],
                 [self.outsider, 403],
                 [self.moderator, 201, {'partial': 'Hello'],

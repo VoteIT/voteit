@@ -49,7 +49,7 @@ class ActiveUserListTests(ActiveUserViewSetBase):
     def test_list_unauthenticated(self):
         url = reverse("active-users-list")
         response = self.client.get(url)
-        self.assertEqual(401, response.status_code)
+        self.assertEqual(403, response.status_code)
 
 
 class ActiveActionTests(ActiveUserViewSetBase):
@@ -94,10 +94,10 @@ class ActiveActionTests(ActiveUserViewSetBase):
         response = self.client.post(url, {"active": True})
         self.assertEqual(404, response.status_code)
 
-    def test_unauthenticated_gets_401(self):
+    def test_unauthenticated_gets_403(self):
         url = reverse("active-users-active", kwargs={"pk": self.meeting.pk})
         response = self.client.post(url, {"active": True})
-        self.assertEqual(401, response.status_code)
+        self.assertEqual(403, response.status_code)
 
     def test_component_disabled_gets_404(self):
         self.component.enabled = False
@@ -166,10 +166,10 @@ class PurgeActionTests(ActiveUserViewSetBase):
         response = self.client.post(url, {"hours": 1})
         self.assertEqual(404, response.status_code)
 
-    def test_purge_unauthenticated_gets_401(self):
+    def test_purge_unauthenticated_gets_403(self):
         url = reverse("active-users-purge", kwargs={"pk": self.meeting.pk})
         response = self.client.post(url, {"hours": 1})
-        self.assertEqual(401, response.status_code)
+        self.assertEqual(403, response.status_code)
 
 
 @override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)

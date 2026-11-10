@@ -94,7 +94,7 @@ class RemovalRequestsTests(APITestCase):
 
     def test_anonymous(self):
         response = self.client.get(reverse("removal-requests-list"))
-        self.assertIn(response.status_code, (401, 403))
+        self.assertEqual(403, response.status_code)
 
     def _remove(self, user):
         with (

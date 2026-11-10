@@ -61,7 +61,7 @@ class MeetingApiTokenViewSetTest(APITestCase):
         response = self.client.get(
             reverse("meeting-api-token-list"), {"meeting": self.meeting.pk}
         )
-        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.status_code, 403)
 
     # --- create ---
 

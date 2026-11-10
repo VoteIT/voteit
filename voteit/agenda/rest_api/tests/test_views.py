@@ -49,7 +49,7 @@ class AgendaItemViewTestCase(APITestCase):
             data=data,
             method="post",
             expected=[
-                [None, 401],
+                [None, 403],
                 [self.moderator, 201],
                 [self.participant, 403],
             ],
@@ -101,7 +101,7 @@ class AgendaItemViewTestCase(APITestCase):
             data=data,
             method="post",
             expected=[
-                [None, 401],
+                [None, 403],
                 [self.outsider, 403],
             ],
         ):
@@ -147,7 +147,7 @@ class AgendaItemViewTestCase(APITestCase):
             url=url,
             method="post",
             expected=[
-                [None, 401],
+                [None, 403],
                 [self.moderator, 200],
                 [self.participant, 200],
                 [self.outsider, 404],
@@ -181,7 +181,7 @@ class ExportParticipantsViewSetTests(APITestCase):
             self,
             url=url,
             method="get",
-            expected=[[None, 401], [self.participant, 404], [self.moderator, 200]],
+            expected=[[None, 403], [self.participant, 404], [self.moderator, 200]],
         ):
             func(*args)
 
@@ -254,7 +254,7 @@ class AgendaItemBulkChangeViewTests(APITestCase):
             data=data,
             method="post",
             expected=[
-                [None, 401],
+                [None, 403],
                 [self.moderator, 200],
                 # meeting field rejects non-moderators
                 [self.participant, 400],
@@ -516,7 +516,7 @@ class AgendaItemBulkDeleteViewTests(APITestCase):
             data=data,
             method="post",
             expected=[
-                [None, 401],
+                [None, 403],
                 [self.participant, 400],
                 [self.outsider, 400],
             ],

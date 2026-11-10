@@ -93,9 +93,9 @@ class SetDelegationVotersViewSetTests(APITestCase):
         self.mem_hangaround.refresh_from_db()
         self.assertEqual(4, self.mem_hangaround.votes)
 
-    def test_anonymous_gets_401(self):
+    def test_anonymous_gets_403(self):
         response = self._post(None, weights=[{"user": self.lead_hat.pk, "weight": 4}])
-        self.assertEqual(401, response.status_code)
+        self.assertEqual(403, response.status_code)
         self.assertEqual(
             {"detail": "Authentication credentials were not provided."},
             response.json(),

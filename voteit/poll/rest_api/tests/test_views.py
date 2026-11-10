@@ -76,7 +76,7 @@ class PollViewSetTests(APITestCase):
             data=data,
             method="POST",
             expected=[
-                [None, 401],
+                [None, 403],
                 [self.participant, 403],
                 [self.outsider, 403],
                 [self.moderator, 201, data],
@@ -152,7 +152,7 @@ class PollViewSetTests(APITestCase):
             url=reverse("poll-detail", kwargs={"pk": poll.id}),
             method="get",
             expected=[
-                [None, 401],
+                [None, 403],
                 [self.participant, 200],
                 [self.outsider, 404],
                 [
@@ -185,7 +185,7 @@ class PollViewSetTests(APITestCase):
             url=reverse("poll-detail", kwargs={"pk": poll.id}),
             method="get",
             expected=[
-                [None, 401],
+                [None, 403],
                 [self.participant, 404],
                 [self.outsider, 404],
                 [
@@ -216,7 +216,7 @@ class PollViewSetTests(APITestCase):
             url=reverse("poll-detail", kwargs={"pk": poll.id}),
             method="get",
             expected=[
-                [None, 401],
+                [None, 403],
                 [self.participant, 404],
                 [self.outsider, 404],
                 [
@@ -245,7 +245,7 @@ class PollViewSetTests(APITestCase):
             url=reverse("poll-detail", kwargs={"pk": poll.id}),
             method="get",
             expected=[
-                [None, 401],
+                [None, 403],
                 [self.participant, 404],
                 [self.outsider, 404],
                 [self.moderator, 404],
@@ -826,7 +826,7 @@ class ManualCreateERViewTests(APITestCase):
             data={"meeting": self.meeting.pk, "weights": self.weights},
             format="json",
         )
-        self.assertEqual(401, response.status_code)
+        self.assertEqual(403, response.status_code)
         self.client.force_login(self.moderator)
         response = self.client.post(
             self.url,
@@ -937,7 +937,7 @@ class VoteViewSetTests(APITestCase):
             data=data,
             method="post",
             expected=[
-                [None, 401],
+                [None, 403],
                 [self.outsider, 403],
                 [self.voter, 201],
             ],

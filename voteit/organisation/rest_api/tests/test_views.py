@@ -70,7 +70,7 @@ class OrganisationViewSetTests(APITestCase):
             method="POST",
             expected=(
                 (self.manager, 405),
-                (None, 401),
+                (None, 403),
             ),
         ):
             func(*params)
@@ -98,12 +98,12 @@ class OrganisationViewSetTests(APITestCase):
                 (None, 200, expected_data),
                 (
                     self.other_org_user,
-                    401,
+                    403,
                     {"detail": "You're logged in to another organisation"},
                 ),
                 (
                     self.other_org_manager,
-                    401,
+                    403,
                     {"detail": "You're logged in to another organisation"},
                 ),
             ),
@@ -121,7 +121,7 @@ class OrganisationViewSetTests(APITestCase):
             expected=(
                 (self.manager, 200, data),
                 (self.user, 403),
-                (None, 401),
+                (None, 403),
             ),
         ):
             func(*params)
@@ -215,7 +215,7 @@ class OrganisationBrandingTests(APITestCase):
             expected=(
                 (self.manager, 200, {"colors": colors}),
                 (self.user, 403),
-                (None, 401),
+                (None, 403),
             ),
         ):
             func(*params)
@@ -306,7 +306,7 @@ class OrganisationRolesTests(APITestCase):
 
     def test_unauthorized(self):
         response = self.client.get(self.list_url)
-        self.assertEqual(response.status_code, HTTPStatus.UNAUTHORIZED)
+        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
 
     def test_manager(self):
         self.client.force_login(self.manager)
@@ -391,7 +391,7 @@ class OrganisationRolesChangeTests(APITestCase):
 
     def test_add_unauthorized(self):
         response = self.client.post(self.add_url, self._add_payload(), format="json")
-        self.assertEqual(HTTPStatus.UNAUTHORIZED, response.status_code)
+        self.assertEqual(HTTPStatus.FORBIDDEN, response.status_code)
 
     def test_add_member_forbidden(self):
         self.client.force_login(self.member)
@@ -431,7 +431,7 @@ class OrganisationRolesChangeTests(APITestCase):
 
     def test_remove_unauthorized(self):
         response = self.client.post(self.remove_url, self._add_payload(), format="json")
-        self.assertEqual(HTTPStatus.UNAUTHORIZED, response.status_code)
+        self.assertEqual(HTTPStatus.FORBIDDEN, response.status_code)
 
     def test_remove_member_forbidden(self):
         self.client.force_login(self.member)
@@ -543,7 +543,7 @@ class MatchOrphansViewSetTests(APITestCase):
     def test_no_api_key(self):
         url = reverse("match-orphans-list")
         response = self.client.get(url, data={"email_in": "jeff@blaha.se"})
-        self.assertEqual(401, response.status_code)
+        self.assertEqual(403, response.status_code)
 
     def test_several_matches(self):
         url = reverse("match-orphans-list")
@@ -592,7 +592,7 @@ class HandleIdentitiesViewSetTests(APITestCase):
 
     def test_no_auth(self):
         response = self.client.get(self._mk_query_url({"identity_in": "one,two"}))
-        self.assertEqual(401, response.status_code)
+        self.assertEqual(403, response.status_code)
 
     def test_basic_query(self):
         response = self.client.get(
@@ -734,7 +734,7 @@ class TermsOfServiceViewSetTests(APITestCase):
             url=self.list_url,
             method="post",
             data={"body": "New"},
-            expected=((None, 401), (self.user, 403)),
+            expected=((None, 403), (self.user, 403)),
         ):
             func(*params)
         self.client.force_login(self.manager)
@@ -770,7 +770,7 @@ class TermsOfServiceViewSetTests(APITestCase):
             method="patch",
             data=data,
             expected=(
-                (None, 401),
+                (None, 403),
                 (self.user, 403),
                 (self.manager, 200, {"body": "Fixed"}),
             ),
@@ -869,7 +869,7 @@ class TermsOfServiceViewSetTests(APITestCase):
             url=self.accept_url,
             method="post",
             data=data,
-            expected=((None, 401), (self.user, 200), (self.manager, 200)),
+            expected=((None, 403), (self.user, 200), (self.manager, 200)),
         ):
             func(*params)
         self.client.force_login(self.user)

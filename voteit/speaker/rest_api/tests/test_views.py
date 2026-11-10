@@ -67,7 +67,7 @@ class SpeakerListsViewTests(APITestCase):
             data=data,
             method="post",
             expected=[
-                [None, 401],
+                [None, 403],
                 [self.moderator, 201],
                 [self.participant, 403],
                 [self.list_moderator, 201],
@@ -137,7 +137,7 @@ class SpeakerListsViewTests(APITestCase):
             data={"is_open": False},
             method="patch",
             expected=[
-                [None, 401],
+                [None, 403],
                 [self.list_moderator, 200],
                 [self.moderator, 200],
                 [self.participant, 403],
@@ -154,7 +154,7 @@ class SpeakerListsViewTests(APITestCase):
             data=data,
             method="patch",
             expected=[
-                [None, 401],
+                [None, 403],
                 [self.moderator, 200],
                 [self.participant, 403],
                 [self.list_moderator, 200],
@@ -168,7 +168,7 @@ class SpeakerListsViewTests(APITestCase):
             url=reverse("speaker-lists-detail", kwargs={"pk": self.slist.pk}),
             method="delete",
             expected=[
-                [None, 401],
+                [None, 403],
                 [self.moderator, 204],
                 [self.participant, 403],
                 [self.list_moderator, 204],
@@ -195,7 +195,7 @@ class SpeakerListsViewTests(APITestCase):
             url=url,
             method="get",
             expected=[
-                [None, 401],
+                [None, 403],
                 [self.participant, 200],
                 [
                     self.list_moderator,
@@ -224,7 +224,7 @@ class SpeakerListsViewTests(APITestCase):
             url=url,
             method="post",
             expected=[
-                [None, 401],
+                [None, 403],
                 [
                     self.participant,
                     403,
@@ -365,7 +365,7 @@ class SpeakerListSystemViewTests(APITestCase):
         room = self.meeting.rooms.create()
         data = {"room": room.pk, "method_name": "simple"}
         for user, status in (
-            (None, 401),
+            (None, 403),
             (self.participant, 403),
             (self.list_moderator, 403),
         ):
@@ -634,7 +634,7 @@ class HistoricSpeakerViewTests(APITestCase):
         url = reverse("speaker-history-list") + f"?meeting={self.meeting.pk}"
         # anon
         response = self.client.get(url)
-        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.status_code, 403)
         # Speaker/Participant
         self.client.force_login(self.user_one)
         response = self.client.get(reverse("speaker-history-list"))
@@ -1047,7 +1047,7 @@ class SpeakerSystemRolesListTests(APITestCase):
 
     def test_unauthorized(self):
         response = self.client.get(self.list_url, {"context": self.system.pk})
-        self.assertEqual(HTTPStatus.UNAUTHORIZED, response.status_code)
+        self.assertEqual(HTTPStatus.FORBIDDEN, response.status_code)
 
     def test_participant_can_list(self):
         self.client.force_login(self.participant)
@@ -1152,7 +1152,7 @@ class SpeakerSystemRolesChangeTests(APITestCase):
 
     def test_add_unauthorized(self):
         response = self.client.post(self.add_url, self._add_payload(), format="json")
-        self.assertEqual(HTTPStatus.UNAUTHORIZED, response.status_code)
+        self.assertEqual(HTTPStatus.FORBIDDEN, response.status_code)
 
     def test_add_participant_forbidden(self):
         self.client.force_login(self.participant)
@@ -1200,7 +1200,7 @@ class SpeakerSystemRolesChangeTests(APITestCase):
 
     def test_remove_unauthorized(self):
         response = self.client.post(self.remove_url, self._add_payload(), format="json")
-        self.assertEqual(HTTPStatus.UNAUTHORIZED, response.status_code)
+        self.assertEqual(HTTPStatus.FORBIDDEN, response.status_code)
 
     def test_remove_participant_forbidden(self):
         self.client.force_login(self.participant)

@@ -327,13 +327,13 @@ class ImportInvitesPermissionTests(APITestCase):
             format="multipart",
         )
 
-    def test_unauthenticated_returns_401(self):
+    def test_unauthenticated_returns_403(self):
         f = io.BytesIO(b"email\nalice@example.com")
         f.name = "invites.csv"
         response = self.client.post(
             URL, {"meeting": self.meeting.pk, "file": f}, format="multipart"
         )
-        self.assertEqual(HTTPStatus.UNAUTHORIZED, response.status_code)
+        self.assertEqual(HTTPStatus.FORBIDDEN, response.status_code)
 
     def test_participant_not_moderator_returns_400(self):
         response = self._post(self.participant)
