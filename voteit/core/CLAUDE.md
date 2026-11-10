@@ -103,6 +103,13 @@ the request is withdrawn or made again. The job checks the same timestamp before
 Cancelling the job on abort is therefore only tidiness, and a failed cancel can't send a
 stale email. Requesting again while a request stands keeps the original time and sends nothing.
 
+When the job runs on a user whose report says `no_activity`, it deletes the user instead.
+It holds a row lock, so an abort can't slip in between the check and the delete. After
+commit it ends tracked sessions, closes sockets (`LOGGED_OUT_EVERYWHERE`, flushing
+sessions) and emails a removal confirmation. A delete blocked by `RESTRICT` (content the
+report can't place, like a post without an agenda item) is logged, and the regular abort
+email goes out instead.
+
 Logging in to an account with a pending request is stopped by the
 `stop_if_removal_requested` pipeline step, which redirects to the same abort page
 with a fresh token (`abort_removal_path`).

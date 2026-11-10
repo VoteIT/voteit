@@ -4,6 +4,9 @@ GDPR removal requests.
 Requesting removal emails the account's address after a delay, with a link to
 abort. That email is what protects against someone else requesting removal
 from the user's unattended computer.
+
+A user with nothing to review is instead removed when the delay is up, and the
+email confirms the removal.
 """
 
 from __future__ import annotations
@@ -21,6 +24,9 @@ from django.contrib.auth import get_user_model
 from django.core import signing
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.mail import send_mail
+from django.db import transaction
+from django.db.models import ProtectedError
+from django.db.models import RestrictedError
 from django.template import loader
 from django.utils import translation
 from django.utils.html import strip_tags
@@ -113,16 +119,40 @@ def _cancel(job_id: str, connection) -> None:
 
 
 def email_removal_requested(user_pk: int, requested: str, language: str):
-    """RQ job. Does nothing unless the request it was scheduled for still stands."""
-    try:
-        user = get_user_model().objects.select_related("organisation").get(pk=user_pk)
-    except ObjectDoesNotExist:
-        return
-    if not _is_current(user, requested):
-        return
-    organisation = user.organisation
-    if organisation is None:
-        return
+    """
+    RQ job. Does nothing unless the request it was scheduled for still stands.
+
+    A user with nothing to review is removed, everyone else gets the email with
+    the abort link.
+    """
+    with transaction.atomic():
+        try:
+            # Locked so an abort can't land between the check and the delete.
+            user = (
+                get_user_model()
+                .objects.select_for_update(of=("self",))
+                .select_related("organisation")
+                .get(pk=user_pk)
+            )
+        except ObjectDoesNotExist:
+            return
+        if not _is_current(user, requested):
+            return
+        organisation = user.organisation
+        if organisation is None:
+            return
+        if get_removal_report(user).classification == NO_ACTIVITY and _delete_user(
+            user
+        ):
+            email = user.email
+            context = {
+                "full_name": user.get_full_name() or user.userid or user.username,
+                "org_title": organisation.title,
+            }
+            transaction.on_commit(
+                lambda: _after_removal(user_pk, email, context, language)
+            )
+            return f"Removed user {user_pk}"
     if not user.email:
         logger.info("User %s requested removal but has no email", user.pk)
         return
@@ -131,7 +161,7 @@ def email_removal_requested(user_pk: int, requested: str, language: str):
         html_body = loader.render_to_string(
             "voteit/core/removal_requested.html",
             context={
-                "full_name": user.get_full_name() or user.username,
+                "full_name": user.get_full_name() or user.userid or user.username,
                 "org_title": organisation.title,
                 "abort_url": abort_url,
                 "title": _("Your account is marked for removal"),
@@ -146,6 +176,42 @@ def email_removal_requested(user_pk: int, requested: str, language: str):
         recipient_list=[user.email],
     )
     return f"Sent removal email to user {user.pk}"
+
+
+def _delete_user(user) -> bool:
+    try:
+        with transaction.atomic():
+            user.delete()
+    except (ProtectedError, RestrictedError):
+        # Something the report doesn't cover, e.g. a post without an agenda item.
+        logger.warning("User %s has no activity but could not be deleted", user.pk)
+        return False
+    logger.info("Removed user %s on their own request", user.pk)
+    return True
+
+
+def _after_removal(user_pk: int, email: str, context: dict, language: str) -> None:
+    from voteit.core.sessions import end_tracked_sessions
+    from voteit.messaging.close import close_user_connections
+    from voteit.messaging.models import LOGGED_OUT_EVERYWHERE
+
+    end_tracked_sessions(user_pk)
+    close_user_connections(user_pk, code=LOGGED_OUT_EVERYWHERE, flush_session=True)
+    if not email:
+        return
+    with translation.override(language):
+        subject = _("Your account has been removed")
+        html_body = loader.render_to_string(
+            "voteit/core/removal_completed.html",
+            context={**context, "title": subject},
+        )
+    send_mail(
+        subject=subject,
+        message=strip_tags(html_body),
+        html_message=html_body,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[email],
+    )
 
 
 #: Classifications, least to most in need of care.

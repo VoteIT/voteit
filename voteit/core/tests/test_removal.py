@@ -22,6 +22,7 @@ from voteit.core.removal import get_removal_report
 from voteit.core.removal import get_user_from_abort_token
 from voteit.core.removal import make_abort_token
 from voteit.core.removal import schedule_removal_email
+from voteit.discussion.models import DiscussionPost
 from voteit.invites.models import MeetingInvite
 from voteit.meeting.models import Meeting
 from voteit.poll.models import ElectoralRegister
@@ -118,6 +119,75 @@ class EmailJobTests(RemovalTestMixin, TestCase):
         self.user.save()
         self._run()
         self.assertEqual([], mail.outbox)
+
+
+class RemoveInactiveUserTests(TestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.organisation = Meeting.objects.get(pk=1).organisation
+        cls.user = cls.organisation.users.create(
+            username="nobody",
+            first_name="Nobody",
+            email="nobody@voteit.se",
+            removal_requested=now(),
+        )
+
+    def _run(self):
+        with (
+            patch("voteit.core.sessions.end_tracked_sessions") as end_sessions,
+            patch("voteit.messaging.close.close_user_connections") as close,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            result = email_removal_requested(
+                self.user.pk, self.user.removal_requested.isoformat(), "en"
+            )
+        return result, end_sessions, close
+
+    def test_removed_and_confirmed(self):
+        result, end_sessions, close = self._run()
+        self.assertEqual(f"Removed user {self.user.pk}", result)
+        self.assertFalse(User.objects.filter(pk=self.user.pk).exists())
+        end_sessions.assert_called_once_with(self.user.pk)
+        close.assert_called_once()
+        self.assertEqual(self.user.pk, close.call_args.args[0])
+        self.assertTrue(close.call_args.kwargs["flush_session"])
+        self.assertEqual(1, len(mail.outbox))
+        msg = mail.outbox[0]
+        self.assertEqual(["nobody@voteit.se"], msg.to)
+        self.assertEqual("Your account has been removed", msg.subject)
+        self.assertNotIn("abort-removal", msg.body)
+
+    def test_name_falls_back_to_userid(self):
+        self.user.first_name = ""
+        self.user.userid = "nobody-1"
+        self.user.save()
+        self._run()
+        self.assertIn("Hi nobody-1!", mail.outbox[0].body)
+
+    def test_removed_without_email(self):
+        self.user.email = ""
+        self.user.save()
+        self._run()
+        self.assertFalse(User.objects.filter(pk=self.user.pk).exists())
+        self.assertEqual([], mail.outbox)
+
+    def test_delete_blocked_sends_abort_email(self):
+        """A post without an agenda item isn't in the report, but blocks the delete."""
+        DiscussionPost.objects.create(author=self.user)
+        result, end_sessions, close = self._run()
+        self.assertTrue(User.objects.filter(pk=self.user.pk).exists())
+        end_sessions.assert_not_called()
+        close.assert_not_called()
+        self.assertEqual(1, len(mail.outbox))
+        self.assertIn("abort-removal", mail.outbox[0].body)
+
+    def test_active_user_kept(self):
+        self.user.meeting_roles.create(context_id=1, assigned=["pa"])
+        self._run()
+        self.assertTrue(User.objects.filter(pk=self.user.pk).exists())
+        self.assertIn("abort-removal", mail.outbox[0].body)
 
 
 class RemovalAPITests(RemovalTestMixin, APITestCase):
