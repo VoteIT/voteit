@@ -3,6 +3,7 @@ from typing import List
 
 from django.contrib.auth import get_user_model
 from django.db import models
+from django.utils.timezone import now
 from rest_framework import serializers
 
 from voteit.components.rest_api.serializers import OrganisationComponentSerializer
@@ -252,3 +253,47 @@ class UserQuerySerializer(ExternalOrphanSerializer):
 class MergedIdentitiesSerializer(serializers.Serializer):
     moved_to = serializers.CharField()
     moved = serializers.ListSerializer(child=serializers.CharField())
+
+
+class MeetingInvolvementSerializer(serializers.Serializer):
+    pk = serializers.IntegerField()
+    title = serializers.CharField()
+    state = serializers.CharField()
+    roles = serializers.ListField(child=serializers.CharField())
+    used_invite = serializers.BooleanField()
+    groups = serializers.ListField(
+        child=serializers.CharField(), help_text="Titles of the user's meeting groups."
+    )
+    ongoing_polls = serializers.IntegerField(
+        help_text="Ongoing polls where the user is in the electoral register."
+    )
+    votes = serializers.IntegerField()
+    speaker_entries = serializers.IntegerField(
+        help_text="Times the user has been on a speaker list."
+    )
+    proposals = serializers.IntegerField()
+    discussion_posts = serializers.IntegerField()
+
+
+class RemovalRequestSerializer(serializers.Serializer):
+    """Serializes a ``voteit.core.removal.RemovalReport``."""
+
+    user = UserSerializer()
+    removal_requested = serializers.DateTimeField(source="user.removal_requested")
+    removable_after = serializers.DateTimeField()
+    can_remove = serializers.SerializerMethodField()
+    organisation_roles = serializers.ListField(child=serializers.CharField())
+    classification = serializers.CharField(
+        help_text=(
+            "no_activity, inactive_meetings, active_meeting, ongoing_poll or "
+            "organisation_roles -- least to most in need of care."
+        )
+    )
+    meetings = MeetingInvolvementSerializer(many=True)
+
+    def get_can_remove(self, report) -> bool:
+        """The wait has passed, and it isn't the manager themselves."""
+        return (
+            report.user.pk != self.context["request"].user.pk
+            and now() >= report.removable_after
+        )

@@ -195,6 +195,9 @@ POLL_STATUS_THROTTLE_SECONDS = float(os.getenv("POLL_STATUS_THROTTLE_SECONDS", 1
 # Minutes from a removal request until the email with the abort link is sent -
 # see voteit.core.removal.
 REMOVAL_EMAIL_DELAY_MINUTES = int(os.getenv("REMOVAL_EMAIL_DELAY_MINUTES", 10))
+# Hours after a removal request before an org manager may remove the user,
+# so the owner has time to abort.
+REMOVAL_WAIT_HOURS = int(os.getenv("REMOVAL_WAIT_HOURS", 3))
 
 # DRF
 REST_FRAMEWORK = {

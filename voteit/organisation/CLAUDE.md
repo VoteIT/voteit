@@ -112,6 +112,16 @@ Read-only `list` / `retrieve` of every `GlobalTermsOfService` with `required_fro
 - `current` (`GET /api/terms-of-service/current/`) — open to anyone. What a user accepts: `global_tos` (the latest published global version) and `organisation_tos` (the active one), either may be `null`. `version` is the newest of them, plus the caller's `accepted` and `must_accept`.
 - `accept` (`POST /api/terms-of-service/accept/`) — for logged in users. Takes `version` from `current`; one older than the required version is a 400, so nobody accepts terms they weren't shown. Replaces the previous accept. A login accepts through the pipeline instead.
 
+### `RemovalRequestsViewSet` (`/api/removal-requests/`)
+
+Org managers only. `list` / `retrieve` (by user pk) of the organisation's users with
+`removal_requested` set, oldest first, each with a `voteit.core.removal.get_removal_report`:
+`classification`, `organisation_roles`, per-meeting `meetings` (roles, `used_invite`,
+`groups`, counts of `proposals`, `discussion_posts`, `votes`,
+`speaker_entries` and `ongoing_polls`) and `removable_after`. `can_remove` is false until
+`removable_after` has passed, and always false for the manager's own account. Read-only for
+now. The removal itself comes later, and must enforce the same rules.
+
 ### `MatchOrphansViewSet` (`/api/match-orphans/`)
 
 ID-proxy service endpoint. Requires `HasIDProxyAPIKey`. Accepts `?email_in=a@b.com,c@d.com` (comma-separated, required). Returns users with no `identity_id` matching those emails, along with their organisation host. Used for pre-login orphan matching.

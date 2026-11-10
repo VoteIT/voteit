@@ -12,10 +12,20 @@ from django.utils.timezone import now
 from rest_framework.test import APITestCase
 from rq.exceptions import NoSuchJobError
 
+from voteit.core.removal import ACTIVE_MEETING
+from voteit.core.removal import INACTIVE_MEETINGS
+from voteit.core.removal import NO_ACTIVITY
+from voteit.core.removal import ONGOING_POLL
+from voteit.core.removal import ORGANISATION_ROLES
 from voteit.core.removal import email_removal_requested
+from voteit.core.removal import get_removal_report
 from voteit.core.removal import get_user_from_abort_token
 from voteit.core.removal import make_abort_token
 from voteit.core.removal import schedule_removal_email
+from voteit.invites.models import MeetingInvite
+from voteit.meeting.models import Meeting
+from voteit.poll.models import ElectoralRegister
+from voteit.poll.models import Vote
 
 User = get_user_model()
 VIEWS = "voteit.core.rest_api.views"
@@ -178,3 +188,123 @@ class RemovalAPITests(RemovalTestMixin, APITestCase):
         response = self.client.post(reverse("user-abort-removal"), {"token": "x"})
         self.assertEqual(400, response.status_code)
         self.assertIn("token", response.json())
+
+
+class RemovalReportTests(TestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting = Meeting.objects.get(pk=1)
+        cls.participant = User.objects.get(username="participant")
+        cls.participant.removal_requested = now()
+        cls.participant.save()
+
+    def _set_meeting_state(self, state):
+        Meeting.objects.filter(pk=self.meeting.pk).update(state=state)
+
+    def test_no_activity(self):
+        user = self.meeting.organisation.users.create(
+            username="nobody", removal_requested=now()
+        )
+        report = get_removal_report(user)
+        self.assertEqual(NO_ACTIVITY, report.classification)
+        self.assertEqual([], report.meetings)
+
+    def test_org_roles(self):
+        manager = User.objects.get(username="org_manager")
+        manager.removal_requested = now()
+        # Above an ongoing poll
+        er = ElectoralRegister.objects.create(meeting=self.meeting)
+        er.set_voters_from_dict({manager.pk: 1})
+        self.meeting.polls.create(
+            method_name="simple", electoral_register=er, state="ongoing"
+        )
+        report = get_removal_report(manager)
+        self.assertEqual(ORGANISATION_ROLES, report.classification)
+        self.assertEqual(["org_manager"], report.organisation_roles)
+
+    def test_used_invite_only(self):
+        user = self.meeting.organisation.users.create(
+            username="invited", removal_requested=now()
+        )
+        self._set_meeting_state("closed")
+        MeetingInvite.objects.create(meeting=self.meeting, used_by=user)
+        report = get_removal_report(user)
+        self.assertEqual(INACTIVE_MEETINGS, report.classification)
+        self.assertEqual(1, len(report.meetings))
+        self.assertTrue(report.meetings[0].used_invite)
+        self.assertEqual([], report.meetings[0].roles)
+
+    def test_active_meeting(self):
+        report = get_removal_report(self.participant)
+        self.assertEqual(ACTIVE_MEETING, report.classification)
+        meeting = report.meetings[0]
+        self.assertEqual(
+            (self.meeting.pk, "upcoming", ["pa"]),
+            (meeting.pk, meeting.state, meeting.roles),
+        )
+
+    def test_closed_meeting(self):
+        self._set_meeting_state("closed")
+        report = get_removal_report(self.participant)
+        self.assertEqual(INACTIVE_MEETINGS, report.classification)
+
+    def test_ongoing_poll(self):
+        er = ElectoralRegister.objects.create(meeting=self.meeting)
+        er.set_voters_from_dict({self.participant.pk: 1})
+        self.meeting.polls.create(
+            method_name="simple", electoral_register=er, state="ongoing"
+        )
+        # Not in this one
+        other_er = ElectoralRegister.objects.create(meeting=self.meeting)
+        other_er.set_voters_from_dict({1: 1})
+        self.meeting.polls.create(
+            method_name="simple", electoral_register=other_er, state="ongoing"
+        )
+        report = get_removal_report(self.participant)
+        self.assertEqual(ONGOING_POLL, report.classification)
+        self.assertEqual(1, report.meetings[0].ongoing_polls)
+
+    def test_content(self):
+        ai = self.meeting.agenda_items.create()
+        ai.proposals.create(author=self.participant)
+        ai.discussions.create(author=self.participant)
+        ai.discussions.create(author=self.participant)
+        ai.discussions.create()
+        group = self.meeting.groups.create(title="Board")
+        group.memberships.create(user=self.participant)
+        er = ElectoralRegister.objects.create(meeting=self.meeting)
+        er.set_voters_from_dict({self.participant.pk: 1})
+        poll = self.meeting.polls.create(
+            method_name="simple", electoral_register=er, state="closed"
+        )
+        Vote.objects.create(user=self.participant, poll=poll, abstain=True)
+        with self.assertNumQueries(10):
+            report = get_removal_report(self.participant)
+        meeting = report.meetings[0]
+        self.assertEqual(["Board"], meeting.groups)
+        self.assertEqual(1, meeting.votes)
+        self.assertEqual(0, meeting.speaker_entries)
+        self.assertEqual(1, meeting.proposals)
+        self.assertEqual(2, meeting.discussion_posts)
+
+    def test_content_without_roles_still_listed(self):
+        """Roles can be gone while the content stays."""
+        self._set_meeting_state("archived")
+        ai = self.meeting.agenda_items.create()
+        user = self.meeting.organisation.users.create(
+            username="former", removal_requested=now()
+        )
+        ai.discussions.create(author=user)
+        report = get_removal_report(user)
+        self.assertEqual(INACTIVE_MEETINGS, report.classification)
+        self.assertEqual(1, report.meetings[0].discussion_posts)
+
+    @override_settings(REMOVAL_WAIT_HOURS=5)
+    def test_removable_after(self):
+        report = get_removal_report(self.participant)
+        self.assertEqual(
+            self.participant.removal_requested + timedelta(hours=5),
+            report.removable_after,
+        )

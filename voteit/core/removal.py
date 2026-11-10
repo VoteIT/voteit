@@ -8,6 +8,9 @@ from the user's unattended computer.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from dataclasses import field
+from datetime import datetime
 from datetime import timedelta
 from logging import getLogger
 from urllib.parse import urlencode
@@ -143,3 +146,155 @@ def email_removal_requested(user_pk: int, requested: str, language: str):
         recipient_list=[user.email],
     )
     return f"Sent removal email to user {user.pk}"
+
+
+#: Classifications, least to most in need of care.
+NO_ACTIVITY = "no_activity"
+INACTIVE_MEETINGS = "inactive_meetings"
+ACTIVE_MEETING = "active_meeting"
+ONGOING_POLL = "ongoing_poll"
+#: Above the rest: removing them changes who runs the organisation.
+ORGANISATION_ROLES = "organisation_roles"
+
+
+@dataclass
+class MeetingInvolvement:
+    pk: int
+    title: str
+    state: str
+    roles: list[str] = field(default_factory=list)
+    used_invite: bool = False
+    groups: list[str] = field(default_factory=list)
+    ongoing_polls: int = 0
+    votes: int = 0
+    speaker_entries: int = 0
+    proposals: int = 0
+    discussion_posts: int = 0
+
+
+@dataclass
+class RemovalReport:
+    """What removing a user would affect, for a manager to judge."""
+
+    user: object
+    removable_after: datetime
+    organisation_roles: list[str]
+    meetings: list[MeetingInvolvement]
+    classification: str
+
+
+def removable_after(user) -> datetime:
+    return user.removal_requested + timedelta(hours=settings.REMOVAL_WAIT_HOURS)
+
+
+def _count_by(values) -> dict[int, int]:
+    counts: dict[int, int] = {}
+    for key in values:
+        counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
+def get_removal_report(user) -> RemovalReport:
+    """Expects a user with removal_requested set. A fixed number of queries."""
+    from voteit.discussion.models import DiscussionPost
+    from voteit.invites.models import MeetingInvite
+    from voteit.meeting.models import GroupMembership
+    from voteit.meeting.models import Meeting
+    from voteit.meeting.statemachines import MeetingStateMachine
+    from voteit.poll.models import Poll
+    from voteit.poll.models import Vote
+    from voteit.poll.statemachines import PollStateMachine
+    from voteit.proposal.models import Proposal
+    from voteit.speaker.models import Speaker
+
+    org_roles = user.organisation_roles.first()
+    org_roles = list(org_roles.assigned) if org_roles else []
+    roles = {
+        meeting_pk: list(assigned)
+        for meeting_pk, assigned in user.meeting_roles.values_list(
+            "context_id", "assigned"
+        )
+    }
+    invited = set(
+        MeetingInvite.objects.filter(used_by=user).values_list("meeting_id", flat=True)
+    )
+    groups: dict[int, list[str]] = {}
+    for meeting_pk, title in (
+        GroupMembership.objects.filter(user=user)
+        .order_by("meeting_group__title")
+        .values_list("meeting_group__meeting_id", "meeting_group__title")
+    ):
+        groups.setdefault(meeting_pk, []).append(title)
+    ongoing_polls = _count_by(
+        Poll.objects.filter(
+            state=PollStateMachine.ongoing.value,
+            electoral_register__voter_data__has_key=str(user.pk),
+        ).values_list("meeting_id", flat=True)
+    )
+    votes = _count_by(
+        Vote.objects.filter(user=user).values_list("poll__meeting_id", flat=True)
+    )
+    speaker_entries = _count_by(
+        Speaker.objects.filter(user=user).values_list(
+            "speaker_list__meeting_id", flat=True
+        )
+    )
+    proposals = _count_by(
+        Proposal.objects.filter(author=user).values_list(
+            "agenda_item__meeting_id", flat=True
+        )
+    )
+    discussion_posts = _count_by(
+        DiscussionPost.objects.filter(author=user).values_list(
+            "agenda_item__meeting_id", flat=True
+        )
+    )
+
+    meeting_pks = set().union(
+        roles,
+        invited,
+        groups,
+        ongoing_polls,
+        votes,
+        speaker_entries,
+        proposals,
+        discussion_posts,
+    )
+    meeting_pks.discard(None)
+    meetings = [
+        MeetingInvolvement(
+            pk=meeting.pk,
+            title=meeting.title,
+            state=meeting.state,
+            roles=roles.get(meeting.pk, []),
+            used_invite=meeting.pk in invited,
+            groups=groups.get(meeting.pk, []),
+            ongoing_polls=ongoing_polls.get(meeting.pk, 0),
+            votes=votes.get(meeting.pk, 0),
+            speaker_entries=speaker_entries.get(meeting.pk, 0),
+            proposals=proposals.get(meeting.pk, 0),
+            discussion_posts=discussion_posts.get(meeting.pk, 0),
+        )
+        for meeting in Meeting.objects.filter(pk__in=meeting_pks).order_by("pk")
+    ]
+    active_states = {
+        MeetingStateMachine.upcoming.value,
+        MeetingStateMachine.ongoing.value,
+    }
+    if org_roles:
+        classification = ORGANISATION_ROLES
+    elif any(m.ongoing_polls for m in meetings):
+        classification = ONGOING_POLL
+    elif any(m.state in active_states for m in meetings):
+        classification = ACTIVE_MEETING
+    elif meetings:
+        classification = INACTIVE_MEETINGS
+    else:
+        classification = NO_ACTIVITY
+    return RemovalReport(
+        user=user,
+        removable_after=removable_after(user),
+        organisation_roles=org_roles,
+        meetings=meetings,
+        classification=classification,
+    )

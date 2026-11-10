@@ -42,6 +42,12 @@ _user_fieldsets.append(
         {"fields": ("img_url", "image")},
     )
 )
+_user_fieldsets.append(
+    (
+        "GDPR",
+        {"fields": ("removal_requested",)},
+    )
+)
 
 
 class OnlineFilter(admin.SimpleListFilter):
@@ -248,6 +254,7 @@ class UserAdmin(DefaultUserAdmin):
         OnlineFilter,
         LinkedFilter,
         "is_active",
+        ("removal_requested", admin.EmptyFieldListFilter),
         "is_superuser",
         "is_staff",
         "date_joined",

@@ -28,6 +28,7 @@ from social_django.utils import load_strategy
 from voteit.core import PERM
 from voteit.core.loggers import log_roles_change
 from voteit.core.loggers import notification_logger
+from voteit.core.removal import get_removal_report
 from voteit.core.rest_api import router
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.core.rest_api.permissions import HasIDProxyAPIKey
@@ -58,6 +59,11 @@ class IsOrgManagerOrReadOnly(permissions.BasePermission):
     def has_permission(self, request, view):
         if request.method in permissions.SAFE_METHODS:
             return True
+        return is_org_manager(request.user)
+
+
+class IsOrgManager(permissions.BasePermission):
+    def has_permission(self, request, view):
         return is_org_manager(request.user)
 
 
@@ -448,3 +454,30 @@ class AccountLinkOptionsViewSet(viewsets.ViewSet):
                 ],
             }
         )
+
+
+@router.register("removal-requests", basename="removal-requests")
+class RemovalRequestsViewSet(viewsets.GenericViewSet):
+    """
+    Users in the manager's organisation who asked to be removed, with what
+    removing them would affect. Org managers only.
+    """
+
+    serializer_class = serializers.RemovalRequestSerializer
+    expected_default_http_status = 403
+
+    def get_permissions(self):
+        return [IsOrgManager()]
+
+    def get_queryset(self):
+        return self.request.user.organisation.users.filter(
+            removal_requested__isnull=False
+        ).order_by("removal_requested", "pk")
+
+    def list(self, request):
+        reports = [get_removal_report(user) for user in self.get_queryset()]
+        return Response(self.get_serializer(reports, many=True).data)
+
+    def retrieve(self, request, pk=None):
+        user = get_object_or_404(self.get_queryset(), pk=pk)
+        return Response(self.get_serializer(get_removal_report(user)).data)

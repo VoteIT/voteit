@@ -107,6 +107,20 @@ Logging in to an account with a pending request is stopped by the
 `stop_if_removal_requested` pipeline step, which redirects to the same abort page
 with a fresh token (`abort_removal_path`).
 
+`get_removal_report(user)` gathers what removing a user would affect, for org managers
+(`/api/removal-requests/`, `voteit.organisation`). It lists it explicitly rather than as a
+score, because managers can't read a number. Per meeting, it reports roles, used invite,
+group titles, and counts of proposals, discussion posts, votes, speaker entries and
+ongoing polls the user can vote in. It costs 10 queries,
+whatever the volume.
+
+A meeting is listed if any of these touch it, so content outlives removed roles.
+`classification`, least to most in need of care: `no_activity` (nothing listed, left for a
+future job), `inactive_meetings`, `active_meeting` (upcoming or ongoing),
+`ongoing_poll` (in the electoral register of an ongoing poll), `organisation_roles`
+(trumps the rest: it changes who runs the organisation). `removable_after` is the request
+time plus `REMOVAL_WAIT_HOURS` (default 3), which gives the owner time to abort.
+
 ## Registry Pattern (`component.py`)
 
 `Registry(Dict[str, T])` is a typed dict that doubles as a decorator:
