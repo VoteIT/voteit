@@ -36,10 +36,31 @@ jobs:
       with:
         persist-credentials: false
 
+    - name: Pick voteit_org branch
+      id: org_ref
+      # Same branch name as this build if voteit_org has one, otherwise main.
+      # head_ref is the PR source branch; ref_name covers pushes and tags.
+      # Passed via env since branch names are untrusted input.
+      env:
+        BRANCH: ${{ github.head_ref || github.ref_name }}
+      run: |
+        set +e
+        git ls-remote --exit-code --heads https://github.com/voteit/voteit_org.git "refs/heads/$BRANCH" > /dev/null
+        rc=$?
+        set -e
+        case $rc in
+          0) ref="$BRANCH" ;;
+          2) ref=main ;;
+          *) echo "git ls-remote failed ($rc)"; exit 1 ;;
+        esac
+        echo "Using voteit_org@$ref"
+        echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
     - name: Checkout / voteit_org
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         repository: voteit/voteit_org
+        ref: ${{ steps.org_ref.outputs.ref }}
         path: src/voteit_org
         persist-credentials: false
 
