@@ -222,6 +222,7 @@ class MeetingDetailSerializer(UserRolesMixin, BaseModelSerializer):
             "group_roles_active",
             "group_votes_active",
             "vote_transfer_policy",
+            "vote_clearable_after",
         ]
         fields = read_only_fields + [
             "title",

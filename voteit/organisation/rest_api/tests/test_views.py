@@ -56,6 +56,8 @@ class OrganisationViewSetTests(APITestCase):
             "providers": [],
             "title": "Other org",
             "pk": cls.other_org.pk,
+            "vote_retention_days": 90,
+            "auto_clear_votes": False,
         }
 
     def test_create(self):

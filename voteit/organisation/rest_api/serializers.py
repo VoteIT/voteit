@@ -82,12 +82,14 @@ class OrganisationSerializer(serializers.ModelSerializer):
             "title",
         ]
         fields = read_only_fields + [
+            "auto_clear_votes",
             "body",
             "colors",
             "default_language",
             "help_info",
             "logo",
             "page_title",
+            "vote_retention_days",
         ]
 
     @staticmethod

@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import Counter
 from contextlib import suppress
 from datetime import datetime
+from datetime import timedelta
 from hashlib import sha512
 from json import dumps
 from logging import getLogger
@@ -334,6 +335,8 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext, StateMachineModelMixi
         counter = Counter()
         abstains = 0
         for v in self.votes.order_by("pk"):
+            if v.cleared:
+                raise PollError(f"Poll {self.pk} has cleared votes")
             w = weights.get(v.user_id, 1)
             if v.abstain:
                 abstains += w
@@ -446,6 +449,50 @@ def _remove_all_mask(value: str) -> str:
     return "*"
 
 
+#: Polls whose result is final, so their votes are never read again.
+#: Not failed: a retried close counts the votes once more.
+VOTE_CLEARABLE_POLL_STATES = frozenset(
+    {"finished", "withheld", "no_result", "canceled"}
+)
+
+
+class VoteQuerySet(models.QuerySet):
+    def cleared(self) -> VoteQuerySet:
+        return self.filter(vote_data__isnull=True, abstain=False)
+
+    def not_cleared(self) -> VoteQuerySet:
+        return self.filter(models.Q(vote_data__isnull=False) | models.Q(abstain=True))
+
+    def in_finished_meetings(self) -> VoteQuerySet:
+        """Not yet cleared votes that could be cleared at some point."""
+        from voteit.meeting.statemachines import MeetingStateMachine
+
+        return (
+            self.not_cleared()
+            .filter(
+                poll__state__in=VOTE_CLEARABLE_POLL_STATES,
+                poll__meeting__state__in=MeetingStateMachine.finished_states,
+                poll__meeting__end_time__isnull=False,
+            )
+            .annotate(
+                clearable_after=models.ExpressionWrapper(
+                    models.F("poll__meeting__end_time")
+                    + models.F("poll__meeting__organisation__vote_retention_days")
+                    * timedelta(days=1),
+                    output_field=models.DateTimeField(),
+                )
+            )
+        )
+
+    def clearable(self, at: datetime | None = None) -> VoteQuerySet:
+        return self.in_finished_meetings().filter(clearable_after__lte=at or now())
+
+    def clear(self) -> int:
+        # update() skips Vote.save(), which would refuse users no longer in the
+        # ER, and auto_now.
+        return self.update(vote_data=None, abstain=False, changed=now())
+
+
 # FIXME: We don't log votes right now, but that might be a good idea, at least the actor?
 @history_log("user__organisation")
 @auditlog.register(
@@ -501,6 +548,11 @@ class Vote(RulesModelMixin, models.Model):
     def __str__(self):  # pragma: no cover
         return f"{self.__class__.__name__} from {self.user}"
 
+    @property
+    def cleared(self) -> bool:
+        """Content removed after the meeting, see VoteQuerySet.clear."""
+        return self.vote_data is None and not self.abstain
+
     def save(self, **kw):
         er = self.poll.electoral_register
         if not er:
@@ -509,9 +561,12 @@ class Vote(RulesModelMixin, models.Model):
             raise NotAllowedToVote()
         if self.abstain and self.vote_data is not None:
             self.vote_data = None
+        if self.cleared:
+            # That combination marks a cleared vote.
+            raise PollError("A vote must have vote data or abstain")
         super().save(**kw)
 
-    objects: models.Manager
+    objects: VoteQuerySet = VoteQuerySet.as_manager()
 
 
 @auditlog.register(

@@ -10,9 +10,11 @@ from redis.exceptions import TimeoutError
 from rq.job import Job
 
 from voteit.core import RQ_DEFAULT_QUEUE
+from voteit.core.decorators import schedule_job
 from voteit.meeting.channels import broadcast_meeting
 from voteit.poll.messages import PollStatus
 from voteit.poll.models import Poll
+from voteit.poll.models import Vote
 
 logger = getLogger(__name__)
 
@@ -86,3 +88,19 @@ def schedule_poll_status_publish(poll_pk: int) -> None:
             poll_pk,
         )
         publish_poll_status(poll_pk)
+
+
+@schedule_job("20 4 * * *")
+def auto_clear_votes() -> int:
+    """
+    Clear votes in organisations with auto_clear_votes, once their meeting
+    closed vote_retention_days ago. Nobody is told, the meetings are long over.
+    """
+    qs = Vote.objects.filter(
+        poll__meeting__organisation__auto_clear_votes=True
+    ).clearable()
+    pks = list(qs.values_list("pk", flat=True))
+    count = Vote.objects.filter(pk__in=pks).not_cleared().clear()
+    if count:
+        logger.info("auto_clear_votes: cleared %s votes", count)
+    return count

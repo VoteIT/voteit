@@ -229,6 +229,7 @@ class MeetingViewSetTests(APITestCase):
                 "title": "Testfixture meeting",
                 "visible_in_lists": False,
                 "vote_transfer_policy": None,
+                "vote_clearable_after": None,
             },
             response.json(),
         )

@@ -43,7 +43,7 @@ class DashboardTests(TestCase):
             poll.save()
             for user in users:
                 with set_actor(user):
-                    poll.votes.create(user=user)
+                    poll.votes.create(user=user, abstain=True)
         # Logentries needs to be set to yesterday
         LogEntry.objects.update(timestamp=timezone.now() - timedelta(days=1))
         populate_history_log()

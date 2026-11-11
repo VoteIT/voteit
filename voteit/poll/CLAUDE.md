@@ -14,7 +14,7 @@ The poll app handles the full lifecycle of a vote: creation, configuration, vote
 
 **ElectoralRegister (ER)** — immutable snapshot of eligible voters and weights (`voter_data` dict of `{user_pk: weight}`). `voter_data` is write-protected after creation; use `set_voters_from_dict()` to populate before saving.
 
-**Vote** — one vote per (user, poll). `vote_data` is a string; converted to/from the method's Pydantic vote model via `vote` property. Votes are upserted (update-or-create), never deleted via API. Abstentions set `abstain=True` and clear `vote_data`.
+**Vote** — one vote per (user, poll). `vote_data` is a string; converted to/from the method's Pydantic vote model via `vote` property. Votes are upserted (update-or-create), never deleted via API. Abstentions set `abstain=True` and clear `vote_data`. Their content can be cleared after the meeting, see Clearing votes.
 
 **VoteTransfer** — delegates voting rights from `source` to `target` within a meeting. Unique on source per meeting. Deleted automatically when either user leaves the meeting.
 
@@ -37,8 +37,10 @@ Three registries in `registries.py`, each a typed dict used as a decorator:
 @poll_methods
 class MyMethod(PollMethod): ...
 
+
 @er_policy
 class MyPolicy(ElectoralRegisterPolicy): ...
+
 
 @vote_transfer_policies
 class MyPolicy(VoteTransferPolicy): ...
@@ -122,6 +124,37 @@ Handlers in `signals.py` (subscribed to `voteit.messaging` signals):
 Message types are chanx `BaseMessage` subclasses in `messages.py`, registered with
 `@outgoing`. There's no longer an incoming vote message - votes are cast via the REST
 endpoint above.
+
+## Clearing votes
+
+A vote's content can be removed once its result can't be recounted from `Vote` rows and the
+organisation's appeal window is over. The row is kept as a tombstone: `vote_data IS NULL AND
+abstain = false` *is* the cleared state (`Vote.cleared`, `VoteQuerySet.cleared()`), with
+`changed` as the time it was cleared. The frontend recognises it by `vote` null and
+`abstain` false, so it can say "your vote was removed" rather than "you didn't vote". Vote
+counts stay put. `Vote.save()` refuses that combination, and
+`finalize_vote_data()` raises on it, so it can't come about any other way.
+
+`VoteQuerySet.clearable()` picks votes where:
+- the poll is `finished`, `withheld`, `no_result` or `canceled` (`VOTE_CLEARABLE_POLL_STATES`).
+  **Never `failed`**: `on_enter_failed` drops `ballot_data`, and a retried `close` counts the
+  votes again;
+- the meeting is in `MeetingStateMachine.finished_states` (a reopened meeting is not), and
+  `end_time + organisation.vote_retention_days` (default 90, min 1) has passed.
+
+`Meeting.vote_clearable_after` mirrors that rule for one meeting and is on
+`MeetingDetailSerializer`.
+
+`VoteQuerySet.clear()` is an `update()`: it skips `Vote.save()` (which would refuse a user no
+longer in the ER), `post_save`, and auditlog. Auditlog masks vote content anyway.
+
+- `POST /api/votes/clear/` with an optional `{"meeting": pk}` clears the user's own votes and
+  pushes them as `vote.changed` on the user channel. Returns `{"cleared": n, "pending":
+  [{"meeting", "clearable_after", "votes"}]}` for closed meetings still inside the window.
+- `auto_clear_votes` (`jobs.py`, daily 04:20) clears every clearable vote in organisations
+  with `Organisation.auto_clear_votes`. It sends nothing.
+
+`anonymise_user` still deletes all of a removed user's votes, cleared ones included.
 
 ## Permissions
 

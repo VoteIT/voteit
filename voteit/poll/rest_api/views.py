@@ -6,6 +6,7 @@ from django.db import transaction
 from django.http import Http404
 from django.http import HttpResponse
 from django.utils.decorators import method_decorator
+from django.utils.timezone import now
 from django.views.decorators.cache import cache_page
 from rest_framework import permissions
 from rest_framework import status
@@ -22,6 +23,8 @@ from voteit.core.rest_api.mixins import StateMachineMixin
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.meeting.rest_api.filters import ForceMeetingWithRoleFilter
 from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.messaging.channels import UserChannel
+from voteit.poll.messages import GenericVoteResponse
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
 from voteit.poll.models import Vote
@@ -155,13 +158,14 @@ class VoteTransferViewSet(
 
 @router.register("votes", basename="vote")
 class VoteViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericViewSet):
-    """Create-only - there's no list/retrieve, votes are fetched via WS on subscribe."""
+    """Cast and clear only - there's no list/retrieve, votes are fetched via WS on subscribe."""
 
     queryset = Vote.objects.none()
     serializer_class = serializers.VoteAddSerializer
     permission_type_map = {
         **VerboseAutoPermissionViewSetMixin.permission_type_map,
         "create": None,  # Checked in serializer via poll field
+        "clear": None,  # Only touches the user's own votes
     }
     expected_default_http_status = 405
 
@@ -177,6 +181,51 @@ class VoteViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericViewSet):
                 vote, context=self.get_serializer_context()
             ).data,
             status=response_status,
+        )
+
+    @action(
+        methods=["post"],
+        detail=False,
+        serializer_class=serializers.ClearVotesSerializer,
+    )
+    def clear(self, request):
+        """
+        Clear the content of the user's votes in meetings that closed
+        ``vote_retention_days`` ago. ``pending`` lists the meetings where that
+        time hasn't come yet.
+        """
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        votes = Vote.objects.filter(user=request.user)
+        if meeting_pk := serializer.validated_data.get("meeting"):
+            votes = votes.filter(poll__meeting_id=meeting_pk)
+        with transaction.atomic():
+            pks = list(votes.clearable().values_list("pk", flat=True))
+            cleared = Vote.objects.filter(pk__in=pks).not_cleared().clear()
+            user_ch = UserChannel.from_instance(request.user)
+            for vote in Vote.objects.filter(pk__in=pks).order_by("pk"):
+                user_ch.sync_publish(
+                    GenericVoteResponse(payload=serializers.VoteSerializer(vote).data)
+                )
+        pending = (
+            votes.in_finished_meetings()
+            .filter(clearable_after__gt=now())
+            .values("poll__meeting_id", "clearable_after")
+            .annotate(votes=models.Count("pk"))
+            .order_by("clearable_after", "poll__meeting_id")
+        )
+        return Response(
+            {
+                "cleared": cleared,
+                "pending": [
+                    {
+                        "meeting": row["poll__meeting_id"],
+                        "clearable_after": row["clearable_after"],
+                        "votes": row["votes"],
+                    }
+                    for row in pending
+                ],
+            }
         )
 
 

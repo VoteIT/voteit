@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from datetime import timedelta
 from logging import getLogger
 from random import sample
 from string import ascii_lowercase
@@ -269,6 +270,17 @@ class Meeting(
         for ap in access_policies.values():
             if obj := ap.objects.filter(meeting=self, **query).first():
                 yield obj  # All of them are 1-1 relations
+
+    @property
+    def vote_clearable_after(self) -> datetime | None:
+        """When votes may be cleared. Mirrors VoteQuerySet.in_finished_meetings."""
+        if (
+            self.state not in MeetingStateMachine.finished_states
+            or self.end_time is None
+            or self.organisation is None
+        ):
+            return None
+        return self.end_time + timedelta(days=self.organisation.vote_retention_days)
 
     @property
     def vote_transfer_policy(self) -> VoteTransferPolicy | None:

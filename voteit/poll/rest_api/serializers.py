@@ -36,6 +36,7 @@ __all__ = (
     "PollCreateSerializer",
     "VoteSerializer",
     "VoteAddSerializer",
+    "ClearVotesSerializer",
 )
 
 
@@ -364,6 +365,17 @@ class VoteAddSerializer(serializers.Serializer):
         )
         self._created = created
         return vote
+
+
+class ClearVotesSerializer(serializers.Serializer):
+    """
+    Clear the requesting user's votes once the meeting is over. Without
+    ``meeting``, in every meeting where it's allowed.
+    """
+
+    # A plain pk: votes are filtered by user, so an unknown or foreign meeting
+    # clears nothing, and doesn't reveal whether it exists.
+    meeting = serializers.IntegerField(required=False, allow_null=True)
 
 
 class VoteTransferSerializer(serializers.ModelSerializer):

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from auditlog.registry import auditlog
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator
 from django.db import models
 from django.utils.timezone import now
 from social_core.backends.utils import load_backends
@@ -151,6 +152,15 @@ class Organisation(BaseContent, RoleContextMixin, OrganisationContext):
         blank=True,
         default="",
         validators=[validate_language],
+    )
+    vote_retention_days: int = models.PositiveIntegerField(
+        verbose_name="Days after a meeting closed before votes may be cleared",
+        default=90,
+        validators=[MinValueValidator(1)],
+    )
+    auto_clear_votes: bool = models.BooleanField(
+        verbose_name="Clear votes automatically when the retention period is over",
+        default=False,
     )
 
     class Meta:

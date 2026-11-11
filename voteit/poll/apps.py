@@ -11,6 +11,7 @@ class PollConfig(AppConfig):
         from voteit.poll.rest_api import views  # noqa
         from voteit.poll import messages  # noqa
         from voteit.poll import signals  # noqa
+        from voteit.poll import jobs  # noqa
         from voteit.poll.app.polls import register
 
         register()
