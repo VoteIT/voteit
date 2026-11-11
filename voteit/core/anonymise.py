@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from logging import getLogger
 
+from django.db import models
 from django.db import transaction
 from django.utils.timezone import now
 
@@ -67,5 +68,23 @@ def anonymise_user(user) -> None:
     if image_name:
         storage = user._meta.get_field("image").storage
         transaction.on_commit(lambda: storage.delete(image_name))
+    blank_actor_details(user.pk)
     transaction.on_commit(lambda: end_user_access(user.pk))
     logger.info("Anonymised user %s", user.pk)
+
+
+def blank_actor_details(user_pk: int) -> int:
+    """
+    Remove the email and IP address auditlog stores on entries the user made.
+    The entries themselves stay, scrubbing their changes is for a later job.
+    Also run on every user delete, see signals.py.
+    """
+    from auditlog.models import LogEntry
+
+    return (
+        LogEntry.objects.filter(actor_id=user_pk)
+        .filter(
+            models.Q(actor_email__isnull=False) | models.Q(remote_addr__isnull=False)
+        )
+        .update(actor_email=None, remote_addr=None)
+    )

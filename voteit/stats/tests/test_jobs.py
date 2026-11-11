@@ -63,11 +63,24 @@ class PopulateJobTests(TestCase):
             ai = self.meeting.agenda_items.create(title="An agenda item")
             ai.body = "<p>Some content</p>"
             ai.save()
+        # Counted by the object's organisation, whoever the actor is
         with set_actor(self.outsider):
             ai.body = "<p>Changed content</p>"
             ai.save()
+        ai.body = "<p>No actor</p>"
+        ai.save()
         entry = self._do_job()
-        self.assertEqual(entry.action_count, 2)
+        self.assertEqual(entry.action_count, 4)
+
+    def test_action_count_deleted_actor(self):
+        user = User.objects.create(
+            username="leaving", organisation=self.moderator.organisation
+        )
+        with set_actor(user):
+            self.meeting.agenda_items.create(title="An agenda item")
+        user.delete()
+        entry = self._do_job()
+        self.assertEqual(entry.action_types["agenda.agendaitem:create"], 1)
 
     def _mk_speaker_list(self):
         return self.meeting.speaker_systems.create(
@@ -101,8 +114,9 @@ class PopulateJobTests(TestCase):
                 inv.accept(user=user)
                 inv.save()
 
+        # The outsider's invite is to this organisation's meeting
         entry = self._do_job()
-        self.assertEqual(entry.accepted_invitation_count, 2)
+        self.assertEqual(entry.accepted_invitation_count, 3)
 
     def test_online_duration(self):
         for user in (self.moderator, self.participant, self.outsider):

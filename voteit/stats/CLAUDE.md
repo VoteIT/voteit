@@ -16,11 +16,11 @@ Key fields:
 
 | Field | Source |
 |---|---|
-| `action_count` / `action_types` | `auditlog.LogEntry` |
+| `action_count` / `action_types` | `auditlog.LogEntry`, by `additional_data["o"]` |
 | `user_online_count` / `online_duration` / `connection_count` | `voteit.messaging.Connection` |
-| `login_count` | auditlog updates on `User` |
+| `login_count` | auditlog updates on `User`, by `additional_data["o"]` |
 | `speaker_count` / `spoken_duration` | `voteit.speaker.Speaker` |
-| `accepted_invitation_count` | `voteit.invites.MeetingInvite` |
+| `accepted_invitation_count` | `voteit.invites.MeetingInvite`, by the meeting's organisation |
 | `proposal_outcomes` | `voteit.proposal.Proposal` final states |
 | `content_types` | registry (see below) |
 
@@ -34,6 +34,8 @@ Key fields:
 - Skips organisations that already have a log for the target date (idempotent).
 - Skips "uninteresting" days — no `LogEntry` and no `Connection` activity.
 - Date range filters use `mk_daterange_filter()` which produces `__gte` / `__lt` bounds on a datetime field (avoids slow `__date` lookups on unindexed columns).
+- Log entries are attributed to the organisation of the object (`additional_data["o"]`, see `AuditLogMixin`), never the actor's. Actions by staff, jobs (no actor) or since deleted users still count. Entries from before that was set everywhere were backfilled by `migrations/0002`, falling back to the actor's organisation when the object was gone.
+- Users can be deleted, so per-user sources lose them: connections go through `org.users` and are not counted for deleted users. Accepted, it only matters for the day before the job runs.
 - `translate_action_keys()` converts auditlog integer action codes (0–3) to `create`/`update`/`delete`/`access` strings before storing in `action_types`.
 
 ## Registry: history_log decorator

@@ -367,17 +367,21 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext, StateMachineModelMixi
         return self.result
 
     def _lock_proposals(self):
-        for proposal in self.proposals.filter(
-            state=ProposalStateMachine.published.value
-        ).select_subclasses():
+        for proposal in (
+            self.proposals.filter(state=ProposalStateMachine.published.value)
+            .select_related("agenda_item__meeting")
+            .select_subclasses()
+        ):
             with suppress(TransitionNotAllowed):
                 proposal.lock_for_vote(force=True)
                 proposal.save()
 
     def _publish_proposals(self):
-        for proposal in self.proposals.filter(
-            state=ProposalStateMachine.voting.value
-        ).select_subclasses():
+        for proposal in (
+            self.proposals.filter(state=ProposalStateMachine.voting.value)
+            .select_related("agenda_item__meeting")
+            .select_subclasses()
+        ):
             with suppress(TransitionNotAllowed):
                 proposal.publish(force=True)
                 proposal.save()
@@ -385,7 +389,9 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext, StateMachineModelMixi
     def set_proposals_from_result(self):
         approved_pks = set(self.result.approved)
         denied_pks = set(self.result.denied)
-        for proposal in self.proposals.select_subclasses():
+        for proposal in self.proposals.select_related(
+            "agenda_item__meeting"
+        ).select_subclasses():
             with suppress(TransitionNotAllowed):
                 if proposal.pk in approved_pks:
                     proposal.approved(force=True)
@@ -493,7 +499,6 @@ class VoteQuerySet(models.QuerySet):
         return self.update(vote_data=None, abstain=False, changed=now())
 
 
-# FIXME: We don't log votes right now, but that might be a good idea, at least the actor?
 @history_log("user__organisation")
 @auditlog.register(
     include_fields=[
@@ -547,6 +552,10 @@ class Vote(RulesModelMixin, models.Model):
 
     def __str__(self):  # pragma: no cover
         return f"{self.__class__.__name__} from {self.user}"
+
+    def get_additional_data(self):
+        """For auditlog"""
+        return self.poll.get_additional_data()
 
     @property
     def cleared(self) -> bool:

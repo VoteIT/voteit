@@ -4,6 +4,7 @@ from abc import ABCMeta
 from abc import abstractmethod
 from typing import TYPE_CHECKING
 
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 
 if TYPE_CHECKING:
@@ -48,27 +49,34 @@ class AuditLogMixin:
 
     def get_additional_data(self):
         """
-        Annotate logentry with some extra data. Avoid expensive lookups here,
-        we can always add annotations to the log afterwards.
+        Annotate logentry with the organisation (o), meeting (m) and agenda item (ai).
+        The stats job attributes entries to organisations by "o", so it should be
+        set whenever there is one. That may fetch the meeting, at most one query
+        per relation since Django caches them on the instance.
         """
         data = {}
-        if hasattr(self, "organisation_id") and self.organisation_id:
-            data["o"] = self.organisation_id
-        if hasattr(self, "meeting_id") and self.meeting_id:
-            data["m"] = self.meeting_id
-        if hasattr(self, "agenda_item_id") and self.agenda_item_id:
-            data["ai"] = self.agenda_item_id
-        # Ai specific
         if getattr(self, "name", None) == "agenda_item":
             data["ai"] = self.pk
-            if self.meeting_id:
-                data["m"] = self.meeting_id
-        # Meeting specific
-        if getattr(self, "name", None) == "meeting":
-            data["m"] = self.pk
-            if self.organisation_id:
-                data["o"] = self.organisation_id
+        elif ai_id := getattr(self, "agenda_item_id", None):
+            data["ai"] = ai_id
+        # A property on most MeetingContext models, a FK or self on the rest.
+        if (meeting := _get_related(self, "meeting")) is not None:
+            data["m"] = meeting.pk
+            org_id = meeting.organisation_id
+        elif not (org_id := getattr(self, "organisation_id", None)):
+            org = _get_related(self, "organisation")
+            org_id = org.pk if org is not None else None
+        if org_id:
+            data["o"] = org_id
         return data
+
+
+def _get_related(instance, attr: str):
+    # Within a cascading delete the parent may already be gone.
+    try:
+        return getattr(instance, attr, None)
+    except ObjectDoesNotExist:
+        return None
 
 
 class AgendaItemContext(AuditLogMixin, ABCModel):

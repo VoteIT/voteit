@@ -57,3 +57,7 @@ class AuditlogIntegrationTests(TestCase):
             },
             entry.changes_dict,
         )
+        self.assertEqual(
+            {"o": self.meeting.organisation_id, "m": self.meeting.pk, "ai": self.ai.pk},
+            entry.additional_data,
+        )

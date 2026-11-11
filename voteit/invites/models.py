@@ -399,4 +399,8 @@ class MeetingGroupAnnotation(models.Model):
             ),
         )
 
+    def get_additional_data(self):
+        """For auditlog"""
+        return self.meeting_group.get_additional_data()
+
     objects: models.Manager

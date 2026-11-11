@@ -1,6 +1,8 @@
 import tempfile
 from unittest.mock import patch
 
+from auditlog.context import set_actor
+from auditlog.models import LogEntry
 from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
 from django.test import TestCase
@@ -59,6 +61,36 @@ class AnonymiseUserTests(TestCase):
         self.assertFalse(user.is_staff)
         self.assertFalse(user.has_usable_password())
         self.assertIsNotNone(user.anonymised)
+
+    def _mk_logged_entry(self, actor):
+        with set_actor(actor, remote_addr="10.0.0.1"):
+            self.meeting.agenda_items.create(title="Logged")
+        entry = LogEntry.objects.filter(actor=actor).latest("pk")
+        self.assertEqual(
+            (actor.email, "10.0.0.1"), (entry.actor_email, entry.remote_addr)
+        )
+        return entry
+
+    def test_blanks_actor_details_in_auditlog(self):
+        entry = self._mk_logged_entry(self.user)
+        other = self._mk_logged_entry(User.objects.get(username="participant"))
+        self._run()
+        entry.refresh_from_db()
+        self.assertEqual((None, None), (entry.actor_email, entry.remote_addr))
+        self.assertEqual(self.user, entry.actor)
+        other.refresh_from_db()
+        self.assertEqual("10.0.0.1", other.remote_addr)
+
+    def test_blanks_actor_details_on_delete(self):
+        user = User.objects.create(
+            username="leaving", email="leaving@example.com", organisation_id=1
+        )
+        entry = self._mk_logged_entry(user)
+        user.delete()
+        entry.refresh_from_db()
+        self.assertEqual(
+            (None, None, None), (entry.actor, entry.actor_email, entry.remote_addr)
+        )
 
     def test_keeps_references(self):
         self._run()

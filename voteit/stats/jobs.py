@@ -71,8 +71,12 @@ def populate_history_log(
     proposal_ct = ContentType.objects.get_by_natural_key("proposal", "proposal")
     user_ct = ContentType.objects.get_for_model(User)
 
+    # Attributed by the object's organisation, not the actor's. The actor may
+    # be gone, missing (jobs) or from another organisation (staff).
     logentry_exists = LogEntry.objects.filter(
-        actor__organisation_id=models.OuterRef("pk"),
+        additional_data__o=models.Func(
+            models.OuterRef("pk"), function="to_jsonb", output_field=models.JSONField()
+        ),
         **mk_daterange_filter("timestamp", date),
     )
 
@@ -95,7 +99,7 @@ def populate_history_log(
         & ~models.Exists(history_exists)
     ):
         org_logentries = LogEntry.objects.filter(
-            actor__organisation=org, **mk_daterange_filter("timestamp", date)
+            additional_data__o=org.pk, **mk_daterange_filter("timestamp", date)
         )
 
         # Last proposal outcome for all proposal with changed state
@@ -117,7 +121,7 @@ def populate_history_log(
             org=org,
             # Data fields
             accepted_invitation_count=MeetingInvite.objects.filter(
-                used_by__organisation=org, **mk_daterange_filter("used_at", date)
+                meeting__organisation=org, **mk_daterange_filter("used_at", date)
             ).count(),
             action_count=org_logentries.count(),
             # Different types of actions from auditlog

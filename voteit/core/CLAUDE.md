@@ -12,7 +12,7 @@ Three context ABCs enforce a consistent interface across all models. Every model
 
 `ABCModel` resolves the Django / `ABCMeta` metaclass conflict. Use it (or a subclass) instead of `models.Model` when you also need abstract methods.
 
-`AuditLogMixin` is mixed into all three context classes. Its `get_additional_data()` populates audit log entries with `{o, m, ai}` keys so log entries are always context-annotated without extra queries.
+`AuditLogMixin` is mixed into all three context classes, and into `User`. Its `get_additional_data()` annotates log entries with `{o, m, ai}`. `o` should be set whenever the object belongs to an organisation: the stats job and the `LogEntry` admin filter attribute entries by it rather than by the actor, who may be deleted, missing (jobs) or from another organisation. Getting `o` can cost a query for the meeting (two for agenda-item content), unless the relation is already loaded on the instance. Logged models outside the mixin (`Vote`, `MeetingGroupAnnotation`) delegate to their parent's `get_additional_data()`.
 
 `BaseContent` (`models.py`) is the shared mixin for user-authored content — it adds `body` (rich text), `author`, `created`, `modified`, `mentions` (M2M to User), and `tags` (ArrayField).
 
@@ -162,9 +162,11 @@ identifies the person:
   addresses, and would otherwise lead a new login back to this row.
 - After commit, tracked sessions end and sockets close with `LOGGED_OUT_EVERYWHERE`.
 
-Auditlog is left alone: the saves are logged as usual, and existing entries are kept.
-Since `User` is logged on names and email, its log entries still hold the old values.
-Purging those is left to a later job.
+Auditlog entries are kept, but `blank_actor_details` clears `actor_email` and
+`remote_addr` on every entry the user made. A `pre_delete` receiver on `User` does the
+same for every delete, since afterwards `actor` is null and the entries can't be found.
+Since `User` is logged on names and email, its own log entries still hold the old
+values. Scrubbing those is left to a later job.
 
 ## Registry Pattern (`component.py`)
 

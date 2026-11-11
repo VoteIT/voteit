@@ -39,6 +39,7 @@ def deferred_register_model(sender: Model, **kw):
 
 def post_init_registrations():
     User = get_user_model()
+    from voteit.core.anonymise import blank_actor_details
     from voteit.core.messages.user import InvalidateUserCache
     from voteit.organisation.channels import OrganisationChannel
 
@@ -51,6 +52,12 @@ def post_init_registrations():
             return
         msg = InvalidateUserCache(payload={"pk": instance.pk})
         OrganisationChannel(instance.organisation_id).sync_publish(msg)
+
+    @receiver(pre_delete, sender=User)
+    def blank_actor_details_on_delete(*, instance: User, **kwargs):
+        # Before the delete sets LogEntry.actor to null, after that the
+        # entries can't be found.
+        blank_actor_details(instance.pk)
 
 
 @receiver(user_logged_in)

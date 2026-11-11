@@ -242,7 +242,32 @@ class AuditLogTests(TestCase):
         p_logs_qs = LogEntry.objects.get_for_object(prop)
         self.assertEqual(1, p_logs_qs.count())
         first = p_logs_qs.first()
-        self.assertEqual({"ai": ai.pk}, first.additional_data)
+        self.assertEqual({"m": meeting.pk, "ai": ai.pk}, first.additional_data)
+
+    def test_get_additional_data_organisation(self):
+        org = self.moderator.organisation
+        org.title = "Changed"
+        org.save()
+        meeting = Meeting.objects.create(organisation=org)
+        ai = meeting.agenda_items.create()
+        prop = ai.proposals.create(body="Stuff")
+        group = meeting.groups.create(title="Group")
+        membership = group.memberships.create(user=self.moderator)
+        self.moderator.first_name = "Changed"
+        self.moderator.save()
+        for obj in (org, meeting, ai, prop, group, membership, self.moderator):
+            with self.subTest(obj=obj):
+                log = LogEntry.objects.get_for_object(obj).latest("pk")
+                self.assertEqual(org.pk, log.additional_data["o"])
+
+    def test_get_additional_data_organisation_on_cascade(self):
+        org = self.moderator.organisation
+        meeting = Meeting.objects.create(organisation=org)
+        prop = meeting.agenda_items.create().proposals.create()
+        expected = {"o": org.pk, "m": meeting.pk, "ai": prop.agenda_item_id}
+        meeting.delete()
+        log = LogEntry.objects.get_for_object(prop).get(action=LogEntry.Action.DELETE)
+        self.assertEqual(expected, log.additional_data)
 
     def test_get_additional_data_and_delete(self):
         meeting = Meeting.objects.create()

@@ -486,10 +486,27 @@ class StateMachineAdminMixin:
 admin.site.unregister(LogEntry)
 
 
+class LogEntryOrganisationFilter(admin.SimpleListFilter):
+    """The organisation the object belongs to, see AuditLogMixin."""
+
+    title = "organisation"
+    parameter_name = "o"
+
+    def lookups(self, request, model_admin):
+        from voteit.organisation.models import Organisation
+
+        return Organisation.objects.values_list("pk", "title")
+
+    def queryset(self, request, queryset):
+        if (value := self.value()) and value.isdigit():
+            return queryset.filter(additional_data__o=int(value))
+        return queryset
+
+
 @admin.register(LogEntry)
 class VoteITLogEntryAdmin(LogEntryAdmin):
     list_display = LogEntryAdmin.list_display + ["meeting"]
-    list_filter = ["actor__organisation"] + LogEntryAdmin.list_filter
+    list_filter = [LogEntryOrganisationFilter] + LogEntryAdmin.list_filter
 
     @admin.display(description="Meeting")
     def meeting(self, obj: LogEntry):

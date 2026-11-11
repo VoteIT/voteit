@@ -317,7 +317,10 @@ class VoteAddSerializer(serializers.Serializer):
     separate "change vote" operation). Set ``abstain`` to abstain instead of voting.
     """
 
-    poll = serializers.PrimaryKeyRelatedField(queryset=Poll.objects.all())
+    # The meeting is for the vote's auditlog entry, see Vote.get_additional_data
+    poll = serializers.PrimaryKeyRelatedField(
+        queryset=Poll.objects.select_related("meeting")
+    )
     vote = PydanticFieldSerializer(allow_null=True, required=False)
     abstain = serializers.BooleanField(required=False, default=False)
 

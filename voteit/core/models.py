@@ -19,6 +19,7 @@ from django.utils.timezone import now
 from rules.contrib.models import RulesModelMixin
 
 from voteit.core.abcs import ABCModel
+from voteit.core.abcs import AuditLogMixin
 from voteit.core.abcs import OrganisationContext
 from voteit.core.fields import RichTextField
 from voteit.core.role import Role
@@ -71,7 +72,7 @@ def user_image_upload_to(instance, filename):
         "is_superuser",
     ],
 )
-class User(AbstractUser):
+class User(AuditLogMixin, AbstractUser):
     """Custom user model linked to organisation"""
 
     name = "user"
