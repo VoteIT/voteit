@@ -83,7 +83,7 @@ class MeetingViewSetTests(APITestCase):
         url = reverse("meeting-list")
         data = {"title": "Hello world"}
         for user, status in (
-            (None, 403),
+            (None, 401),
             (self.org_manager, 201),
             (self.participant, 403),
         ):
@@ -286,7 +286,7 @@ class MeetingViewSetTests(APITestCase):
         response = self.client.post(url, data, content_type="application/json")
         self.assertEqual(
             response.status_code,
-            403,
+            401,
         )
         self.client.force_login(self.participant)
         response = self.client.post(url, data, content_type="application/json")
@@ -772,7 +772,7 @@ class BulkCreateMeetingGroupsTests(APITestCase):
             {"meeting": self.meeting.pk, "groups": [{"title": "B", "groupid": "b"}]},
             format="json",
         )
-        self.assertEqual(403, response.status_code)
+        self.assertEqual(401, response.status_code)
 
     def test_bulk_create_archived_meeting(self):
         self.meeting.archive()
@@ -847,7 +847,7 @@ class GroupMembershipViewSetTests(APITestCase):
             url=url,
             data=data,
             method="POST",
-            expected=[(None, 403), (self.moderator, 201), (self.participant, 403)],
+            expected=[(None, 401), (self.moderator, 201), (self.participant, 403)],
         ):
             func(*params)
 
@@ -857,7 +857,7 @@ class GroupMembershipViewSetTests(APITestCase):
             self,
             url=url,
             expected=[
-                (None, 403),
+                (None, 401),
                 (self.moderator, 200),
                 (self.participant, 200),
                 (self.anon, 404),
@@ -881,7 +881,7 @@ class GroupMembershipViewSetTests(APITestCase):
             method="PATCH",
             data={"role": None},
             expected=[
-                (None, 403),
+                (None, 401),
                 (self.moderator, 200, {"role": None}),
                 (self.participant, 403),
                 (self.anon, 404),
@@ -899,7 +899,7 @@ class GroupMembershipViewSetTests(APITestCase):
             method="PATCH",
             data={"role": None},
             expected=[
-                (None, 403),
+                (None, 401),
                 (self.moderator, 403, {}),
                 (self.participant, 403),
                 (self.anon, 404),
@@ -914,7 +914,7 @@ class GroupMembershipViewSetTests(APITestCase):
             url=url,
             method="DELETE",
             expected=[
-                (None, 403),
+                (None, 401),
                 (self.moderator, 204, {}),
                 (self.participant, 403),
                 (self.anon, 404),
@@ -1173,7 +1173,7 @@ class MeetingRolesChangeTests(APITestCase):
 
     def test_add_unauthorized(self):
         response = self.client.post(self.add_url, self._add_payload(), format="json")
-        self.assertEqual(HTTPStatus.FORBIDDEN, response.status_code)
+        self.assertEqual(HTTPStatus.UNAUTHORIZED, response.status_code)
 
     def test_add_participant_forbidden(self):
         self.client.force_login(self.participant)
@@ -1250,7 +1250,7 @@ class MeetingRolesChangeTests(APITestCase):
 
     def test_remove_unauthorized(self):
         response = self.client.post(self.remove_url, self._add_payload(), format="json")
-        self.assertEqual(HTTPStatus.FORBIDDEN, response.status_code)
+        self.assertEqual(HTTPStatus.UNAUTHORIZED, response.status_code)
 
     def test_remove_participant_forbidden(self):
         self.client.force_login(self.participant)

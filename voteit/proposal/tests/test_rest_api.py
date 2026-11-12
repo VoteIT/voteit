@@ -33,7 +33,7 @@ class ProposalTestCase(APITestCase):
             "shortname": "proposal",
         }
         for user, status in (
-            (None, 403),
+            (None, 401),
             (self.moderator, 201),
             (self.proposer, 201),
             (self.participant, 403),

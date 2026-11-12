@@ -42,7 +42,7 @@ class DiscussionPostAPITests(APITestCase):
             "body": "Hello " + mk_hashtag("world"),
         }
         for user, status in (
-            (None, 403),
+            (None, 401),
             (self.moderator, 201),
             (self.discusser, 201),
             (self.participant, 403),
