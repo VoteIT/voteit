@@ -132,6 +132,7 @@ All commands assume the virtualenv is active. If using `uv run`, prefix with `uv
 | [CLAUDE.md](CLAUDE.md)                 | Architecture guide, conventions, and key patterns         |
 | [docs/narrative.md](docs/narrative.md) | Model relationships and permission rules (also a doctest) |
 | [docs/workflows.md](docs/workflows.md) | Valid state machine combinations across models            |
+| [voteit/stats/README.md](voteit/stats/README.md) | Reading the archived auditlog files        |
 | [INSTALL.md](INSTALL.md)               | Minimal installation notes                                |
 | [CHANGELOG.md](CHANGELOG.md)           | Release history                                           |
 | [CONTRIBUTING.md](CONTRIBUTING.md)     | How to contribute                                         |

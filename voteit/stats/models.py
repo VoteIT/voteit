@@ -1,6 +1,7 @@
 from __future__ import annotations
 from datetime import timedelta
 from datetime import date
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from django.db import models
@@ -89,3 +90,82 @@ class HistoryLog(models.Model):
 
     def __str__(self):
         return f"{self.org} - {self.date}"
+
+
+class OrganisationPeriodStats(models.Model):
+    """
+    Unique counts for an organisation over a calendar month or year.
+    Written by archive_auditlog before it deletes the log entries they come from,
+    since unique counts can't be added up from daily HistoryLog rows.
+    """
+
+    MONTH = "month"
+    YEAR = "year"
+    PERIOD_CHOICES = [(MONTH, "Month"), (YEAR, "Year")]
+
+    org: Organisation = models.ForeignKey(
+        "organisation.Organisation", on_delete=models.PROTECT
+    )
+    period: str = models.CharField(max_length=5, choices=PERIOD_CHOICES)
+    start: date = models.DateField()
+
+    unique_online_users: int = models.IntegerField(
+        default=0,
+        verbose_name="Unique users online",
+        help_text="From socket connections, only correct while those are kept.",
+    )
+    unique_logins: int = models.IntegerField(
+        default=0, verbose_name="Unique users that logged in"
+    )
+    unique_actors: int = models.IntegerField(
+        default=0, verbose_name="Unique users that did something"
+    )
+    active_meetings: int = models.IntegerField(
+        default=0, verbose_name="Meetings with activity"
+    )
+    unique_participants: int = models.IntegerField(
+        default=0, verbose_name="Unique participants in active meetings"
+    )
+    created: datetime = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["org", "period", "start"], name="unique_org_period_start"
+            )
+        ]
+        ordering = ["-start", "period"]
+        verbose_name = "Organisation period stats"
+        verbose_name_plural = "Organisation period stats"
+
+    def __str__(self):
+        return f"{self.org} - {self.period} {self.start}"
+
+
+class MeetingStats(models.Model):
+    """
+    Lifetime numbers for a meeting, kept after the meeting and its log entries are gone.
+    """
+
+    # Not a FK, the row should outlive the meeting.
+    meeting_id: int = models.BigIntegerField(unique=True)
+    org: Organisation = models.ForeignKey(
+        "organisation.Organisation", on_delete=models.PROTECT
+    )
+    title: str = models.CharField(max_length=255, blank=True)
+    first_activity: datetime = models.DateTimeField()
+    last_activity: datetime = models.DateTimeField()
+    unique_participants: int = models.IntegerField(
+        default=0, verbose_name="Unique participants"
+    )
+    unique_voters: int = models.IntegerField(default=0, verbose_name="Unique voters")
+    poll_count: int = models.IntegerField(default=0)
+    updated: datetime = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-last_activity"]
+        verbose_name = "Meeting stats"
+        verbose_name_plural = "Meeting stats"
+
+    def __str__(self):
+        return f"{self.title or self.meeting_id}"

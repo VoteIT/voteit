@@ -76,7 +76,7 @@ def anonymise_user(user) -> None:
 def blank_actor_details(user_pk: int) -> int:
     """
     Remove the email and IP address auditlog stores on entries the user made.
-    The entries themselves stay, scrubbing their changes is for a later job.
+    The entries themselves stay until archive_auditlog removes them, see voteit.stats.archive.
     Also run on every user delete, see signals.py.
     """
     from auditlog.models import LogEntry

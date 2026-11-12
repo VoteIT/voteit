@@ -38,6 +38,25 @@ Key fields:
 - Users can be deleted, so per-user sources lose them: connections go through `org.users` and are not counted for deleted users. Accepted, it only matters for the day before the job runs.
 - `translate_action_keys()` converts auditlog integer action codes (0–3) to `create`/`update`/`delete`/`access` strings before storing in `action_types`.
 
+## Auditlog retention: `manage.py archive_auditlog`
+
+Not scheduled, run by hand. `--months N` (default 18) keeps N whole months plus the current one; without `--commit` it only counts. `--keep-entries` does steps 1 and 2 but not 3, and recomputes existing stats rows, so it can be rerun after fixes.
+Logic lives in `archive.py` so it can be scheduled later. For each calendar month before the cutoff, oldest first:
+
+1. **Aggregate**, while the rest of the log is still there:
+   - `OrganisationPeriodStats` `month` row per org, plus the `year` row when the year is over and has none yet. Since months go oldest first, that happens on the year's first remaining month. Unique counts can't be added up from `HistoryLog`, which is why these exist. Fees are based on them.
+   - `MeetingStats` per meeting with entries that month: participants (ever held `pa`), voters (actor of vote creation, plus current `Vote` rows since votes were only logged from late 2026), polls. `meeting_id` is not a FK, the row outlives the meeting. Recomputed from all remaining entries; once earlier entries of the meeting are deleted, counts only go up.
+2. **Archive** to `auditlog/YYYY-MM.jsonl.gz` in `storages["auditlog_archive"]` (`AUDITLOG_ARCHIVE_ROOT`, default `var/auditlog_archive`, never under `MEDIA_ROOT`). One record per entry: id, ts, action, ct, obj, actor, o/m/ai, cid and `facts` -- the `ARCHIVED_CHANGE_KEYS` whitelist of `changes` (FK ids, roles, state, enabled, `last_login` as `true`). No `object_repr`, free text, email or IP.
+3. **Delete** the exported ids, only after the file is saved. A failed run is safe to rerun: the file is overwritten and existing period rows are kept.
+
+With `--keep-entries` a month row is always recomputed, months are deleted whole. A year row only when no earlier month of the year was deleted (archive file but no entries), see `year_complete`.
+
+Entries from before late 2024 stored related objects by `str()` (`"Jane Doe (jane) 12"`, meeting titles) and roles in several formats. `migrations/0004` rewrote them to pk strings and sorted role code lists; values it couldn't resolve, mostly deleted users, were left as they were and archive as `null`. `parse_roles` still has to read the formats auditlog writes today.
+
+Participants come from `MeetingRoles` log entries, where auditlog renders roles as `"{Participant (pa)}"` and only the create (or delete) entry carries the user, plus current `MeetingRoles`. `unique_online_users` comes from `Connection`, so it is only correct while those rows are kept.
+
+`additional_data` isn't indexed, so meetings are queried in batches per month.
+
 ## Registry: history_log decorator
 
 `registry.py` exposes `@history_log(org_path)` — a class decorator that registers a model so its instances are counted under `content_types` in each org's daily log.
@@ -66,6 +85,8 @@ Dashboard widgets query `HistoryLog` and live `voteit.messaging.Connection` / `a
 
 `tests/test_jobs.py` — comprehensive coverage of the nightly job: unique constraint, connection counting, action types, speaking stats, invitations, online durations, login count, proposal outcomes, content type registry, and selective date processing.
 
+`tests/test_archive.py` — the archive command: archive contents, deletion, reruns, period and meeting stats.
+
 `tests/test_dashboards.py` — verifies `DailyOrgVoteChart` aggregation and legend/series output.
 
 Run with:
@@ -76,6 +97,6 @@ python manage.py test voteit.stats --keepdb --failfast
 
 ## Conventions
 
-- Stats are **write-once via job** — never mutate `HistoryLog` rows after creation.
+- Stats are **write-once** — never mutate `HistoryLog` or `OrganisationPeriodStats` rows after creation, except through `--keep-entries`. `MeetingStats` is the exception, see above.
 - All aggregation happens in SQL (annotations, subqueries) — avoid Python-side loops over querysets.
 - The stats app depends on many other apps but nothing depends on stats — keep it that way.

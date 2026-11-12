@@ -1,6 +1,8 @@
 from django.contrib import admin
 
 from .models import HistoryLog
+from .models import MeetingStats
+from .models import OrganisationPeriodStats
 
 
 def _fmt_duration(td):
@@ -48,3 +50,47 @@ class HistoryLogAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+class ReadOnlyAdmin(admin.ModelAdmin):
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(OrganisationPeriodStats)
+class OrganisationPeriodStatsAdmin(ReadOnlyAdmin):
+    list_display = (
+        "org",
+        "period",
+        "start",
+        "unique_online_users",
+        "unique_logins",
+        "unique_actors",
+        "active_meetings",
+        "unique_participants",
+    )
+    list_filter = ("period", "org")
+    date_hierarchy = "start"
+
+
+@admin.register(MeetingStats)
+class MeetingStatsAdmin(ReadOnlyAdmin):
+    list_display = (
+        "meeting_id",
+        "title",
+        "org",
+        "first_activity",
+        "last_activity",
+        "unique_participants",
+        "unique_voters",
+        "poll_count",
+    )
+    list_filter = ("org",)
+    search_fields = ("title",)
+    date_hierarchy = "last_activity"

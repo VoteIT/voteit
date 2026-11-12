@@ -12,6 +12,21 @@ VERBOSE_PERMISSIONS = DEBUG
 LOCALE_PATHS = [os.path.join(BASE_DIR, "locales")]
 MEDIA_URL = "media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+# Auditlog archives from archive_auditlog. Not public, keep them out of MEDIA_ROOT.
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+    "auditlog_archive": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+        "OPTIONS": {
+            "location": os.getenv(
+                "AUDITLOG_ARCHIVE_ROOT",
+                os.path.join(BASE_DIR, "var", "auditlog_archive"),
+            ),
+            "base_url": None,
+        },
+    },
+}
 
 STATIC_ROOT = "/app/static/"
 ALLOWED_HOSTS = [
