@@ -55,7 +55,7 @@ class ProposalsAPITests(APITestCase):
             "shortname": "proposal",
         }
         for user, status in (
-            (None, 403),
+            (None, 401),
             (self.moderator, 201),
             (self.proposer, 201),
             (self.participant, 403),
@@ -115,7 +115,7 @@ class ProposalsAPITests(APITestCase):
             "paragraph": self.para.pk,
         }
         for user, status in (
-            (None, 403),
+            (None, 401),
             (self.moderator, 201),
             (self.proposer, 201),
             (self.participant, 403),
@@ -385,7 +385,7 @@ class TextDocumentAPITests(APITestCase):
             "base_tag": "hi",
         }
         for user, status in (
-            (None, 403),
+            (None, 401),
             (self.moderator, 201),
             (self.participant, 403),
             (self.outsider, 403),

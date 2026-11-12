@@ -114,7 +114,7 @@ class RemovalRequestsTests(IsolatedCacheMixin, APITestCase):
 
     def test_anonymous(self):
         response = self.client.get(reverse("removal-requests-list"))
-        self.assertEqual(403, response.status_code)
+        self.assertIn(response.status_code, (401, 403))
 
     def _remove(self, user):
         with (

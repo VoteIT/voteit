@@ -117,7 +117,7 @@ class UserSearchViewSetTests(APITestCase):
     def test_list_anon(self):
         url = reverse("users-list")
         response = self.client.get(url)
-        self.assertEqual(403, response.status_code)
+        self.assertEqual(401, response.status_code)
 
     def test_participant_in_own_meeting(self):
         self.client.force_login(self.participant)
@@ -218,7 +218,7 @@ class UserViewSetTests(IsolatedCacheMixin, APITestCase):
     def test_list_anon(self):
         url = reverse("user-list")
         response = self.client.get(url)
-        self.assertEqual(403, response.status_code)
+        self.assertEqual(401, response.status_code)
 
     def test_update(self):
         self.client.force_login(self.participant)
@@ -276,7 +276,7 @@ class UserViewSetTests(IsolatedCacheMixin, APITestCase):
     def test_update_anon(self):
         url = reverse("user-detail", kwargs={"pk": self.participant.pk})
         response = self.client.put(url, data={"userid": "moderator"})
-        self.assertEqual(403, response.status_code)
+        self.assertEqual(401, response.status_code)
 
     def test_update_bad_name(self):
         self.client.force_login(self.participant)
@@ -317,7 +317,7 @@ class UserViewSetTests(IsolatedCacheMixin, APITestCase):
     def test_switch_anon(self):
         url = reverse("user-switch", kwargs={"pk": self.participant.pk})
         response = self.client.post(url)
-        self.assertEqual(403, response.status_code)
+        self.assertEqual(401, response.status_code)
 
     def test_switch_authenticated(self):
         self.client.force_login(self.participant)
@@ -555,7 +555,7 @@ class UserViewSetTests(IsolatedCacheMixin, APITestCase):
         response = self.client.post(
             reverse("user-request-removal"), {"request_removal": True}, format="json"
         )
-        self.assertEqual(403, response.status_code)
+        self.assertEqual(401, response.status_code)
 
     def test_switching_user_does_not_leave_a_key_that_could_kill_the_new_session(self):
         """switch() re-points one session at another user, so the first user
@@ -745,7 +745,7 @@ class UserImageAPITests(APITestCase):
 
     def test_anon_cannot_upload(self):
         response = self._patch(_JPEG)
-        self.assertEqual(403, response.status_code)
+        self.assertEqual(401, response.status_code)
 
 
 class HealthTests(APITestCase):
@@ -947,7 +947,7 @@ class UserConnectionsTests(IsolatedCacheMixin, APITestCase):
         self.assertEqual("VoteIT ID", data[0]["title"])
 
     def test_connections_requires_login(self):
-        self.assertEqual(403, self.client.get(reverse("user-connections")).status_code)
+        self.assertEqual(401, self.client.get(reverse("user-connections")).status_code)
 
     def test_a_lone_login_method_is_flagged_for_the_ui(self):
         self._social(IDPROXY_PROVIDER, "an-identity")

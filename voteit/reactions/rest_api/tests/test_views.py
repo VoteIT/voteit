@@ -110,7 +110,7 @@ class ReactionButtonViewSetTests(APITestCase):
             "color": "primary",
         }
         for user, status in (
-            (None, 403),
+            (None, 401),
             (self.participant, 403),
         ):
             if user:
@@ -304,7 +304,7 @@ class ReactionButtonActionsTests(APITestCase):
             data=self.target_data,
             method="POST",
             expected=[
-                [None, 403],
+                [None, 401],
                 [self.outsider, 404],
                 [self.participant, 201],
                 [self.moderator, 201],
@@ -320,7 +320,7 @@ class ReactionButtonActionsTests(APITestCase):
             data=self.target_data,
             method="POST",
             expected=[
-                [None, 403],
+                [None, 401],
                 [self.outsider, 404],
                 [self.participant, 403],
                 [self.moderator, 201],
@@ -348,7 +348,7 @@ class ReactionButtonActionsTests(APITestCase):
             data=self.target_data,
             method="POST",
             expected=[
-                [None, 403],
+                [None, 401],
                 [self.outsider, 404],
                 [self.participant, 204],
                 [self.moderator, 204],
@@ -385,7 +385,7 @@ class ReactionButtonActionsTests(APITestCase):
             data=self.target_data,
             method="POST",
             expected=[
-                [None, 403],
+                [None, 401],
                 [self.outsider, 404],
                 [self.participant, 403],
                 [self.moderator, 204],
@@ -403,7 +403,7 @@ class ReactionButtonActionsTests(APITestCase):
             data=self.target_data,
             method="POST",
             expected=[
-                [None, 403],
+                [None, 401],
                 [self.outsider, 404],
                 [self.participant, 200],
                 [self.moderator, 200],

@@ -205,7 +205,7 @@ REMOVAL_WAIT_HOURS = int(os.getenv("REMOVAL_WAIT_HOURS", 3))
 # DRF
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.SessionAuthentication",
+        "voteit.core.rest_api.authentication.SessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "voteit.core.rest_api.permissions.IsAuthenticated",

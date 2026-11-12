@@ -313,7 +313,7 @@ class MatchOrphansViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     filterset_class = OrphanUserEmailFilter
     serializer_class = serializers.ExternalOrphanSerializer
     permission_classes = (HasIDProxyAPIKey,)
-    expected_default_http_status = 403
+    expected_default_http_status = 401
 
     def get_queryset(self):
         User = get_user_model()

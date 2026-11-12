@@ -69,7 +69,7 @@ class MeetingInviteViewSetTests(APITestCase):
         response = self.client.post(url, data)
         self.assertEqual(
             response.status_code,
-            403,
+            401,
         )
         self.client.force_login(self.participant)
         response = self.client.post(url, data)
@@ -636,7 +636,7 @@ class MeetingInviteViewSetCreateTests(APITestCase):
             },
             content_type="application/json",
         )
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 401)
 
     def test_create_non_moderator(self):
         response = self._post(
@@ -1015,7 +1015,7 @@ class MeetingInviteViewSetClearAnnotationsTests(APITestCase):
             {"meeting": self.meeting.pk, "invites": [self.invite.pk]},
             content_type="application/json",
         )
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 401)
 
     @patch.object(MeetingInvitesChannel, "sync_publish")
     def test_clear_sends_invite_changed_with_no_annotations(self, mock_publish):
@@ -1088,7 +1088,7 @@ class InviteDataTypesViewSetTests(APITestCase):
     def test_auth_required(self):
         url = reverse("invite-data-types-list")
         response = self.client.get(url)
-        self.assertEqual(403, response.status_code)
+        self.assertEqual(401, response.status_code)
 
 
 class InviteStateMachineSchemaTests(APITestCase):
