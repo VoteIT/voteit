@@ -201,7 +201,7 @@ class VoteViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericViewSet):
             votes = votes.filter(poll__meeting_id=meeting_pk)
         with transaction.atomic():
             pks = list(votes.clearable().values_list("pk", flat=True))
-            cleared = Vote.objects.filter(pk__in=pks).not_cleared().clear()
+            cleared = Vote.objects.filter(pk__in=pks).clear()
             user_ch = UserChannel.from_instance(request.user)
             for vote in Vote.objects.filter(pk__in=pks).order_by("pk"):
                 user_ch.sync_publish(

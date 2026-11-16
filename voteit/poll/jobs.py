@@ -96,11 +96,11 @@ def auto_clear_votes() -> int:
     Clear votes in organisations with auto_clear_votes, once their meeting
     closed vote_retention_days ago. Nobody is told, the meetings are long over.
     """
-    qs = Vote.objects.filter(
-        poll__meeting__organisation__auto_clear_votes=True
-    ).clearable()
-    pks = list(qs.values_list("pk", flat=True))
-    count = Vote.objects.filter(pk__in=pks).not_cleared().clear()
+    count = (
+        Vote.objects.filter(poll__meeting__organisation__auto_clear_votes=True)
+        .clearable()
+        .clear()
+    )
     if count:
         logger.info("auto_clear_votes: cleared %s votes", count)
     return count
