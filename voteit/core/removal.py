@@ -161,8 +161,7 @@ def email_removal_requested(user_pk: int, requested: str, language: str):
         html_body = loader.render_to_string(
             "voteit/core/removal_requested.html",
             context={
-                "full_name": user.get_full_name() or user.userid or user.username,
-                "org_title": organisation.title,
+                **context,
                 "abort_url": abort_url,
                 "title": _("Your account is marked for removal"),
             },
