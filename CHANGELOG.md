@@ -2,6 +2,15 @@
 
 ## 1.7.0 (unreleased)
 
+- **Removal requests**: Users can ask to have their account removed, with an emailed abort link and a lockout while
+  the request is pending. Users without activity are deleted, org managers review the rest and delete or anonymise
+  them. New settings: `ABORT_REMOVAL_URL`, `REMOVAL_EMAIL_DELAY_MINUTES`, `REMOVAL_WAIT_HOURS`.
+- **Clearing votes**: Users can clear their own votes once a meeting has been closed for `vote_retention_days`.
+  Organisations can enable `auto_clear_votes` to have a nightly job do it.
+- **Organisation default language** for emails sent outside a request.
+- **Auditlog archive**: `manage.py archive_auditlog` moves old entries to the `auditlog_archive` storage
+  (`AUDITLOG_ARCHIVE_ROOT`). Stats now attribute log entries by organisation. Migrations normalise older entries.
+
 
 ## 1.6.2 (2026-11-09)
 
