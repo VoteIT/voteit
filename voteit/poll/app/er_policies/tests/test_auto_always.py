@@ -3,6 +3,7 @@ from django.test import TestCase
 
 from voteit.poll.models import Poll
 from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.poll.app.er_policies.auto_always import AutoAlways
 from voteit.poll.models import ElectoralRegister
@@ -91,3 +92,18 @@ class AutoAlwaysTests(TestCase):
         self.meeting.er_policy_name = AutoAlways.name
         self.meeting.save()
         self.assertEqual(1, self.meeting.electoral_registers.all().count())
+
+    def test_er_created_when_meeting_starts(self):
+        moderator = User.objects.create(username="mod")
+        voter = User.objects.create(username="voter")
+        self.meeting.add_roles(moderator, ROLE_MODERATOR)
+        self.meeting.state = "upcoming"
+        self.meeting.save()
+        er = self.meeting.get_latest_er()
+        self.meeting.add_roles(voter, ROLE_POTENTIAL_VOTER)
+        self.assertEqual(er, self.meeting.get_latest_er())
+        self.meeting.make_ongoing(user=moderator)
+        self.assertEqual(
+            {self.user1.pk: 1, self.user2.pk: 1, voter.pk: 1},
+            self.meeting.get_latest_er().weight_dict,
+        )

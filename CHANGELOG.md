@@ -10,6 +10,9 @@
 - **Organisation default language** for emails sent outside a request.
 - **Auditlog archive**: `manage.py archive_auditlog` moves old entries to the `auditlog_archive` storage
   (`AUDITLOG_ARCHIVE_ROOT`). Stats now attribute log entries by organisation. Migrations normalise older entries.
+- **Bugfix** - With the "Automatic always" electoral register policy, users who became potential voters
+  while the meeting was upcoming or closed got no voting rights once it started. The register is now updated
+  when the meeting becomes ongoing.
 
 
 ## 1.6.2 (2026-11-09)

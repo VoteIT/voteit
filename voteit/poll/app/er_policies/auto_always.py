@@ -5,12 +5,14 @@ from logging import getLogger
 from django.dispatch import receiver
 from django.utils.translation import gettext_lazy as _
 
+from voteit.core.signals import after_sm_transition
 from voteit.core.signals import roles_added
 from voteit.core.signals import roles_removed
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.meeting.signals import er_policy_changed
+from voteit.meeting.statemachines import MeetingStateMachine
 from voteit.poll.abcs import ElectoralRegisterPolicy
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.registries import er_policy
@@ -68,6 +70,16 @@ def new_er_voter_removed(instance: MeetingRoles, roles=(), **kw):
 @receiver(er_policy_changed, sender=AutoAlways)
 def create_when_set(instance: AutoAlways, **kwargs):
     instance.create_er()
+
+
+@receiver(after_sm_transition, sender=Meeting)
+def create_when_meeting_starts(instance: Meeting, target, **kwargs):
+    # Role changes while the meeting isn't ongoing don't create ERs, see new_er_needed
+    if (
+        target.value == MeetingStateMachine.ongoing.value
+        and instance.er_policy_name == AutoAlways.name
+    ):
+        instance.er_policy.create_er()
 
 
 @receiver(new_er_created)
