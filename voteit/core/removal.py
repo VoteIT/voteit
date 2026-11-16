@@ -244,6 +244,9 @@ def remove_user(user, language: str) -> str:
     else:
         anonymise_user(user)
         result = ANONYMISED
+    # An anonymised row keeps removal_requested, so the job would still find it current.
+    transaction.on_commit(lambda: cancel_removal_email(user_pk))
+    transaction.on_commit(lambda: clear_postponed_removal(user_pk))
     transaction.on_commit(lambda: send_removal_confirmation(email, context, language))
     return result
 

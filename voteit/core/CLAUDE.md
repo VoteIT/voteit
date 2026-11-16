@@ -116,8 +116,8 @@ email goes out instead.
 
 `remove_user(user, language)` is the manager's removal (see `RemovalRequestsViewSet.remove`
 in `voteit.organisation`). It deletes the user when the report says `no_activity` and the
-delete isn't blocked, and calls `anonymise_user` otherwise. Either way it ends access and
-sends the removal confirmation after commit. The caller holds the row lock.
+delete isn't blocked, and calls `anonymise_user` otherwise. Either way it ends access,
+cancels the queued email, clears any postpone and sends the removal confirmation after commit. The caller holds the row lock.
 `end_user_access(user_pk)` (`sessions.py`) is the shared "log out everywhere" for code
 running outside the user's own request.
 

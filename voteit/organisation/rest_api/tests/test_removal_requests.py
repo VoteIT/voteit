@@ -10,6 +10,7 @@ from django.urls import reverse
 from django.utils.timezone import now
 from rest_framework.test import APITestCase
 
+from voteit.core.removal import get_postponed_removals
 from voteit.core.removal import postpone_removal
 from voteit.core.testing import IsolatedCacheMixin
 from voteit.organisation.models import Organisation
@@ -153,6 +154,14 @@ class RemovalRequestsTests(IsolatedCacheMixin, APITestCase):
         self.assertEqual({"result": "deleted"}, response.json())
         self.assertFalse(User.objects.filter(pk=user.pk).exists())
         self.assertEqual(["nobody@voteit.se"], mail.outbox[0].to)
+
+    def test_remove_cancels_email_and_postpone(self):
+        postpone_removal(self.participant.pk, "block", now() + timedelta(days=1))
+        self.client.force_login(self.org_manager)
+        with patch("voteit.core.removal.cancel_removal_email") as cancel:
+            self._remove(self.participant)
+        cancel.assert_called_once_with(self.participant.pk)
+        self.assertEqual({}, get_postponed_removals([self.participant.pk]))
 
     def test_remove_confirms_in_organisation_language(self):
         Organisation.objects.filter(pk=1).update(default_language="sv")
