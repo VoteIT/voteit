@@ -1,7 +1,7 @@
 # Base images are pinned by digest so a rebuild of an old tag cannot silently
 # change what lands in the image. Dependabot (.github/dependabot.yml) bumps
 # these; without it, security updates to the base stop arriving.
-FROM python:3.13-slim@sha256:70729b46c69b4f1e97c4822c1af3df53a1476cf5ddc6c087c0c10bc3a5678c2f AS builder
+FROM python:3.13-slim@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90 AS builder
 # This copies an executable that then runs as root during the build, so it is
 # the last place to accept a floating tag.
 COPY --from=ghcr.io/astral-sh/uv:0.12.9@sha256:8b940d3a9d65bed080436972241af2e21c84b5e8c9193f7014ed71479ee795ff /uv /uvx /bin/
@@ -24,7 +24,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install dist/*.whl --no-deps
 
 # Clean stage
-FROM python:3.13-slim@sha256:70729b46c69b4f1e97c4822c1af3df53a1476cf5ddc6c087c0c10bc3a5678c2f
+FROM python:3.13-slim@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
