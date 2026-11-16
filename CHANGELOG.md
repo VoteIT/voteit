@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.7.0 (unreleased)
+
+
 ## 1.6.2 (2026-11-09)
 
 - **Bugfix** - Repeated IRV results are marked randomized when a random tiebreak decided any round.
