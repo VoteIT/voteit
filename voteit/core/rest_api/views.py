@@ -227,8 +227,24 @@ class UserView(
                 language = get_language()
                 transaction.on_commit(lambda: schedule_removal_email(user, language))
         elif user.removal_requested is not None:
-            _abort_removal(user)
-            user.removal_requested = None
+            if _abort_removal(user):
+                user.removal_requested = None
+            else:
+                # Withdrawn or made again meanwhile is fine, removed is not.
+                current = (
+                    get_user_model()
+                    .objects.filter(pk=user.pk, anonymised__isnull=True)
+                    .first()
+                )
+                if current is None:
+                    raise ValidationError(
+                        {
+                            "request_removal": [
+                                _("Your account is already being removed.")
+                            ]
+                        }
+                    )
+                user.removal_requested = current.removal_requested
         return Response(UserAndRolesSerializer(user, context={"request": request}).data)
 
     @action(

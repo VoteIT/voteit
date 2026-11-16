@@ -247,6 +247,35 @@ class RemovalAPITests(RemovalTestMixin, APITestCase):
             )
         cancel.assert_called_once_with(self.user.pk)
 
+    def _withdraw_after(self, change):
+        """Withdraw, with ``change`` applied while the user waits for the lock."""
+        self.user.removal_requested = now()
+        self.user.save()
+        self.client.force_login(self.user)
+
+        def abort(user):
+            change()
+            return False
+
+        with patch(f"{VIEWS}._abort_removal", side_effect=abort):
+            return self.client.post(
+                reverse("user-request-removal"), {"request_removal": False}
+            )
+
+    def test_withdraw_loses_race_to_removal(self):
+        response = self._withdraw_after(
+            lambda: User.objects.filter(pk=self.user.pk).update(anonymised=now())
+        )
+        self.assertEqual(400, response.status_code)
+        self.assertIn("request_removal", response.json())
+
+    def test_withdraw_loses_race_to_withdraw(self):
+        response = self._withdraw_after(
+            lambda: User.objects.filter(pk=self.user.pk).update(removal_requested=None)
+        )
+        self.assertEqual(200, response.status_code)
+        self.assertIsNone(response.json()["removal_requested"])
+
     def test_abort_with_token_anonymous(self):
         self.user.removal_requested = now()
         self.user.save()
