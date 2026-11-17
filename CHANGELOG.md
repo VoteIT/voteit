@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.7.0 (unreleased)
+## 1.7.0 (2027-11-17)
 
 - **Removal requests**: Users can ask to have their account removed, with an emailed abort link and a lockout while
   the request is pending. Users without activity are deleted, org managers review the rest and delete or anonymise
