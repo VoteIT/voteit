@@ -26,10 +26,10 @@ The frontend is a separate single-page application that communicates with this b
 | Layer           | Technology                                 |
 | --------------- | ------------------------------------------ |
 | Framework       | Django 5.2+, Django REST Framework         |
-| Database        | PostgreSQL (psycopg3)                      |
+| Database        | PostgreSQL                      |
 | Real-time       | Django Channels 4, Redis                   |
 | Background jobs | RQ (worker + cron scheduler)               |
-| Auth            | Token auth, Session auth, OAuth2 (IDProxy) |
+| Auth            | Session auth from OAuth2 (IDProxy) |
 | Permissions     | `django-rules` (object-level predicates)   |
 | State machines  | `python-statemachine`                      |
 | Validation      | Pydantic v2                                |
