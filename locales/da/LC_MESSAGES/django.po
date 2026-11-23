@@ -925,3 +925,20 @@ msgstr "Inaktivér"
 #: speaker/statemachines.py:42
 msgid "Stop current speaker first"
 msgstr "Stop den nuværende taler først"
+
+#: organisation/pipeline.py
+msgid ""
+"One of these accounts manages the organisation, so they can't be merged "
+"here. Contact VoteIT to have them merged."
+msgstr ""
+"En af kontiene administrerer organisationen, så de kan ikke lægges sammen "
+"her. Kontakt VoteIT for at få dem lagt sammen."
+
+#: organisation/pipeline.py
+#, python-format
+msgid ""
+"More than one of these accounts has voted, is in an electoral register or in "
+"a group in the same meeting: %(meetings)s"
+msgstr ""
+"Mere end én af kontiene har stemt, står i en valgfortegnelse eller i en "
+"gruppe i samme møde: %(meetings)s"

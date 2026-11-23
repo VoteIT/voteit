@@ -634,3 +634,89 @@ class SocialIntegrationTests(APITestCase):
         self.assertEqual(302, response.status_code)
         usa.refresh_from_db()
         self.assertEqual(usa.user, authenticated_user)
+
+    def _two_used_accounts(self):
+        from voteit.meeting.models import Meeting
+
+        first = Meeting.objects.create(organisation=self.organisation, title="A")
+        second = Meeting.objects.create(
+            organisation=self.organisation, title="B", state="ongoing"
+        )
+        closed = Meeting.objects.create(
+            organisation=self.organisation, title="C", state="closed"
+        )
+        a = self.organisation.users.create(username="dup_a", identity_id="123")
+        b = self.organisation.users.create(username="dup_b", identity_id="123")
+        first.add_roles(a, "pa")
+        closed.add_roles(a, "pa")
+        second.add_roles(b, "pa")
+        return a, b
+
+    def _pause(self):
+        from urllib.parse import urlparse
+
+        response = self._complete()
+        self.assertEqual(302, response.status_code)
+        location = response.get("Location")
+        self.assertTrue(location.startswith("/choose-account?"), location)
+        return parse_qs(urlparse(location).query)["partial_token"][0]
+
+    @responses.activate
+    def test_duplicate_identity_pauses_and_lists_options(self):
+        from django.contrib import auth
+
+        a, b = self._two_used_accounts()
+        token = self._pause()
+        self.assertFalse(auth.get_user(self.client).is_authenticated)
+        options = self.client.get(
+            "/api/identity-account-options/", data={"partial_token": token}
+        ).json()
+        self.assertTrue(options["can_merge"])
+        self.assertEqual("/complete/idproxy/", options["resume_url"])
+        self.assertEqual(
+            {a.pk: ["A"], b.pk: ["B"]},
+            {
+                row["pk"]: [m["title"] for m in row["meetings"]]
+                for row in options["accounts"]
+            },
+        )
+
+    def test_options_unknown_token(self):
+        response = self.client.get(
+            "/api/identity-account-options/", data={"partial_token": "nope"}
+        )
+        self.assertEqual(404, response.status_code)
+
+    @responses.activate
+    def test_duplicate_identity_choose_account(self):
+        from django.contrib import auth
+
+        a, b = self._two_used_accounts()
+        token = self._pause()
+        response = self.client.get(
+            "/complete/idproxy/",
+            data={"partial_token": token, "choose_account": str(b.pk)},
+        )
+        self.assertEqual(302, response.status_code)
+        self.assertEqual(settings.LOGIN_REDIRECT_URL, response.get("Location"))
+        self.assertEqual(b, auth.get_user(self.client))
+        a.refresh_from_db()
+        self.assertTrue(a.is_active)
+
+    @responses.activate
+    def test_duplicate_identity_merge(self):
+        from django.contrib import auth
+
+        a, b = self._two_used_accounts()
+        token = self._pause()
+        response = self.client.get(
+            "/complete/idproxy/",
+            data={"partial_token": token, "merge_accounts": "1"},
+        )
+        self.assertEqual(settings.LOGIN_REDIRECT_URL, response.get("Location"))
+        user = auth.get_user(self.client)
+        self.assertIn(user, (a, b))
+        self.assertEqual(
+            1, self.organisation.users.filter(identity_id="123", is_active=True).count()
+        )
+        self.assertTrue(user.social_auth.filter(uid="123").exists())

@@ -108,6 +108,7 @@ SOCIAL_AUTH_PIPELINE = [
     # Before social_user, while `user` is still only the session's user.
     "voteit.organisation.pipeline.require_connect_intent",
     "voteit.organisation.pipeline.social_user",
+    "voteit.organisation.pipeline.resolve_identity_accounts",
     "voteit.organisation.pipeline.match_existing_user",
     "voteit.organisation.pipeline.stop_if_removal_requested",
     # After the user is resolved, before one is created
@@ -144,6 +145,9 @@ LOGIN_ERROR_URL = "/error"
 #: Where match_existing_user sends someone when it has to ask which account
 #: is theirs. The SPA reads the options from /api/account-link-options/.
 LINK_ACCOUNT_URL = "/link-account"
+#: Where resolve_identity_accounts sends someone with several accounts on one
+#: id proxy identity. The SPA reads the options from /api/identity-account-options/.
+CHOOSE_ACCOUNT_URL = "/choose-account"
 #: Where require_tos_accept sends someone who hasn't accepted the terms of service.
 ACCEPT_TOS_URL = "/accept-tos"
 #: Frontend page linked from the removal email, it POSTs the token to

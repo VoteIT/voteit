@@ -39,12 +39,17 @@ from voteit.core.rest_api import router
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.core.rest_api.permissions import HasIDProxyAPIKey
 from voteit.core.rest_api.permissions import IsAuthenticated
+from voteit.meeting.models import MeetingRoles
+from voteit.meeting.statemachines import MeetingStateMachine
+from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation.matching import find_candidates
 from voteit.organisation.matching import is_elevated
 from voteit.organisation.models import GlobalTermsOfService
 from voteit.organisation.models import Organisation
 from voteit.organisation.models import OrganisationRoles
 from voteit.organisation.models import TermsOfService
+from voteit.organisation.pipeline import find_identity_accounts
+from voteit.organisation.pipeline import why_not_mergeable
 from voteit.organisation.rest_api import serializers
 from voteit.organisation.rest_api.filters import OrphanUserEmailFilter
 from voteit.organisation.rest_api.filters import UserIdentitiesFilter
@@ -457,6 +462,75 @@ class AccountLinkOptionsViewSet(viewsets.ViewSet):
                         ),
                     }
                     for candidate in candidates
+                ],
+            }
+        )
+
+
+@router.register("identity-account-options", basename="identity-account-options")
+class IdentityAccountOptionsViewSet(viewsets.ViewSet):
+    """
+    The accounts a paused id proxy login reaches, for the screen that asks
+    which one to use or whether to merge them.
+
+    Unauthenticated for the same reason as ``AccountLinkOptionsViewSet``.
+    The client answers by sending the person back to
+    ``/complete/idproxy/?partial_token=...&choose_account=<pk>`` or
+    ``...&merge_accounts=1``.
+    """
+
+    permission_classes = (AllowAny,)
+    expected_default_http_status = 400
+
+    def list(self, request):
+        token = request.query_params.get("partial_token")
+        if not token:
+            raise ValidationError({"partial_token": _("Required")})
+        strategy = load_strategy(request)
+        stored = strategy.partial_load(token)
+        if stored is None or stored.backend != IDPROXY_PROVIDER:
+            raise NotFound(_("That question has already been answered."))
+        backend = load_backend(strategy, stored.backend, redirect_uri=None)
+        # Recomputed, never read back from the partial.
+        accounts = find_identity_accounts(
+            backend.organisation, stored.kwargs.get("uid")
+        )
+        meetings = {}
+        for row in (
+            MeetingRoles.objects.filter(
+                user__in=accounts,
+                context__state__in=(
+                    MeetingStateMachine.upcoming.value,
+                    MeetingStateMachine.ongoing.value,
+                ),
+            )
+            .order_by("context__title")
+            .values("user_id", "context_id", "context__title", "context__state")
+        ):
+            meetings.setdefault(row["user_id"], []).append(
+                {
+                    "pk": row["context_id"],
+                    "title": row["context__title"],
+                    "state": row["context__state"],
+                }
+            )
+        reason = why_not_mergeable(accounts) if len(accounts) > 1 else None
+        return Response(
+            data={
+                "provider": stored.backend,
+                "resume_url": f"/complete/{stored.backend}/",
+                "can_merge": len(accounts) > 1 and reason is None,
+                "merge_blocked_reason": reason,
+                "accounts": [
+                    {
+                        "pk": account.pk,
+                        "name": account.get_full_name(),
+                        "userid": account.userid,
+                        "email": account.email,
+                        "last_login": account.last_login,
+                        "meetings": meetings.get(account.pk, []),
+                    }
+                    for account in accounts
                 ],
             }
         )

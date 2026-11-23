@@ -1208,3 +1208,20 @@ msgstr "Stoppa pågående talare först"
 #~ "rösträtt läggs till en röstlängd när en omröstning startar. Om "
 #~ "gruppröster används så kommer rösterna fördelas jämt mellan aktiva "
 #~ "medlemmar i gruppen."
+
+#: organisation/pipeline.py
+msgid ""
+"One of these accounts manages the organisation, so they can't be merged "
+"here. Contact VoteIT to have them merged."
+msgstr ""
+"Ett av kontona administrerar organisationen, så de kan inte slås ihop här. "
+"Kontakta VoteIT för att få dem ihopslagna."
+
+#: organisation/pipeline.py
+#, python-format
+msgid ""
+"More than one of these accounts has voted, is in an electoral register or in "
+"a group in the same meeting: %(meetings)s"
+msgstr ""
+"Mer än ett av kontona har röstat, finns i en röstlängd eller i en grupp i "
+"samma möte: %(meetings)s"

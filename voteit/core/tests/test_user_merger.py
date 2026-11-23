@@ -244,3 +244,341 @@ class ContentTests(TestCase):
         proposal = Proposal.objects.get(pk=proposal.pk)
         self.assertIn(self.target, proposal.mentions.all())
         self.assertNotIn(self.source, proposal.mentions.all())
+
+
+class MergeConflictsTests(TestCase):
+    """
+    Crucial data (votes, electoral registers, meeting groups) for more than one
+    account in the same meeting blocks a merge, whether or not it collides.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.meeting.models import MeetingGroup
+        from voteit.poll.models import ElectoralRegister
+        from voteit.poll.models import Poll
+
+        cls.org = _mk_org()
+        cls.source, cls.target = _mk_pair(cls.org)
+        cls.meeting = _mk_meeting(cls.org)
+        cls.other_meeting = _mk_meeting(cls.org)
+        cls.er = ElectoralRegister.objects.create(meeting=cls.meeting)
+        cls.poll = Poll.objects.create(
+            method_name="simple", electoral_register=cls.er, meeting=cls.meeting
+        )
+        cls.second_poll = Poll.objects.create(
+            method_name="simple", electoral_register=cls.er, meeting=cls.meeting
+        )
+        cls.other_poll = Poll.objects.create(
+            method_name="simple", meeting=cls.other_meeting
+        )
+        cls.group = MeetingGroup.objects.create(meeting=cls.meeting, title="G")
+
+    def _conflicts(self):
+        from voteit.core.user_merger import merge_conflicts
+
+        return merge_conflicts([self.source, self.target])
+
+    def _vote(self, user, poll):
+        from voteit.poll.models import Vote
+
+        # bulk_create skips the electoral register check in save()
+        Vote.objects.bulk_create([Vote(user=user, poll=poll, abstain=True)])
+
+    def test_nothing_crucial(self):
+        self.meeting.add_roles(self.source, "pa")
+        self.meeting.add_roles(self.target, "pa")
+        self.assertEqual(set(), self._conflicts())
+
+    def test_same_poll(self):
+        self._vote(self.source, self.poll)
+        self._vote(self.target, self.poll)
+        self.assertEqual({self.meeting.pk}, self._conflicts())
+
+    def test_different_polls_same_meeting(self):
+        self._vote(self.source, self.poll)
+        self._vote(self.target, self.second_poll)
+        self.assertEqual({self.meeting.pk}, self._conflicts())
+
+    def test_vote_and_electoral_register(self):
+        from voteit.poll.models import ElectoralRegister
+
+        self._vote(self.source, self.poll)
+        ElectoralRegister.objects.create(
+            meeting=self.meeting, voter_data={str(self.target.pk): 1}
+        )
+        self.assertEqual({self.meeting.pk}, self._conflicts())
+
+    def test_group_and_vote(self):
+        from voteit.meeting.models import GroupMembership
+
+        GroupMembership.objects.create(meeting_group=self.group, user=self.source)
+        self._vote(self.target, self.poll)
+        self.assertEqual({self.meeting.pk}, self._conflicts())
+
+    def test_different_meetings(self):
+        self._vote(self.source, self.poll)
+        self._vote(self.target, self.other_poll)
+        self.assertEqual(set(), self._conflicts())
+
+
+class GroupMembershipTests(TestCase):
+    """GroupMembership.user has related_name="+", so it needs its own handling."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.meeting.models import GroupRole
+        from voteit.meeting.models import MeetingGroup
+
+        cls.org = _mk_org()
+        cls.source, cls.target = _mk_pair(cls.org)
+        cls.meeting = _mk_meeting(cls.org)
+        cls.role = GroupRole.objects.create(
+            meeting=cls.meeting, title="Voter", roles=["pv"]
+        )
+        cls.group = MeetingGroup.objects.create(meeting=cls.meeting, title="G1")
+        cls.shared = MeetingGroup.objects.create(meeting=cls.meeting, title="G2")
+
+    def _memberships(self, user):
+        from voteit.meeting.models import GroupMembership
+
+        return GroupMembership.objects.filter(user=user)
+
+    def test_membership_moved_with_role_and_votes(self):
+        from voteit.meeting.models import GroupMembership
+
+        GroupMembership.objects.create(
+            meeting_group=self.group, user=self.source, role=self.role, votes=2
+        )
+        UserMerger(self.source, self.target).run()
+        self.assertFalse(self._memberships(self.source).exists())
+        moved = self._memberships(self.target).get()
+        self.assertEqual(self.group, moved.meeting_group)
+        self.assertEqual(self.role, moved.role)
+        self.assertEqual(2, moved.votes)
+
+    def test_membership_in_shared_group_is_skipped(self):
+        from voteit.meeting.models import GroupMembership
+
+        GroupMembership.objects.create(
+            meeting_group=self.shared, user=self.source, votes=1
+        )
+        GroupMembership.objects.create(
+            meeting_group=self.shared, user=self.target, role=self.role, votes=3
+        )
+        log = UserMerger(self.source, self.target).run()
+        kept = self._memberships(self.target).get()
+        self.assertEqual(self.role, kept.role)
+        self.assertEqual(3, kept.votes)
+        self.assertTrue(any("GroupMembership" in msg for msg in log.skipped))
+
+    def test_membership_survives_source_meeting_roles(self):
+        """
+        Deleting the source's MeetingRoles cascades into its memberships, so
+        they must have moved before that.
+        """
+        from voteit.meeting.models import GroupMembership
+
+        GroupMembership.objects.create(
+            meeting_group=self.group, user=self.source, role=self.role
+        )
+        self.assertTrue(self.meeting.has_roles(self.source, "pv"))
+        UserMerger(self.source, self.target).run()
+        self.assertEqual(self.group, self._memberships(self.target).get().meeting_group)
+        self.assertTrue(self.meeting.has_roles(self.target, "pv"))
+
+    def test_dry_run_leaves_memberships(self):
+        from voteit.meeting.models import GroupMembership
+
+        GroupMembership.objects.create(meeting_group=self.group, user=self.source)
+        log = UserMerger(self.source, self.target, dry_run=True).run()
+        self.assertTrue(self._memberships(self.source).exists())
+        self.assertTrue(any("GroupMembership" in msg for msg in log.moved))
+
+
+class PickMergeTargetTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.org = _mk_org()
+        cls.meeting = _mk_meeting(cls.org)
+
+    def _pick(self, *users, session_user=None):
+        from voteit.core.user_merger import pick_merge_target
+
+        return pick_merge_target(list(users), session_user)
+
+    def test_most_activity(self):
+        a, b = _mk_pair(self.org)
+        self.meeting.add_roles(b, "pa")
+        self.assertEqual(b, self._pick(a, b))
+
+    def test_elevated_beats_activity(self):
+        from voteit.organisation.roles import ROLE_ORG_MANAGER
+
+        a, b = _mk_pair(self.org)
+        self.meeting.add_roles(b, "pa")
+        self.org.add_roles(a, ROLE_ORG_MANAGER)
+        self.assertEqual(a, self._pick(a, b))
+
+    def test_session_user_breaks_a_tie(self):
+        a, b = _mk_pair(self.org)
+        self.assertEqual(b, self._pick(a, b, session_user=b))
+
+    def test_latest_login_breaks_a_tie(self):
+        from django.utils.timezone import now
+
+        a, b = _mk_pair(self.org)
+        b.last_login = now()
+        self.assertEqual(b, self._pick(a, b))
+
+
+class AdminMergeActionTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        from django.contrib.auth import get_user_model
+
+        cls.org = _mk_org()
+        cls.meeting = _mk_meeting(cls.org)
+        cls.admin_user = get_user_model().objects.create_superuser(
+            username="merge-admin"
+        )
+
+    def test_more_active_user_becomes_target(self):
+        from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
+        from django.urls import reverse
+
+        a, b = _mk_pair(self.org)
+        self.meeting.add_roles(a, "pa")
+        self.client.force_login(self.admin_user)
+        response = self.client.post(
+            reverse("admin:core_user_changelist"),
+            {"action": "merge_users_action", ACTION_CHECKBOX_NAME: [a.pk, b.pk]},
+        )
+        self.assertEqual(302, response.status_code)
+        location = response["Location"]
+        self.assertIn(f"source={b.pk}&target={a.pk}", location)
+        self.assertIn("score_src=0&score_tgt=1", location)
+
+
+class AuditTrailTests(TestCase):
+    """What a merge leaves in auditlog, which update() alone wouldn't."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.meeting.models import MeetingGroup
+        from voteit.poll.models import Poll
+
+        cls.org = _mk_org()
+        cls.meeting = _mk_meeting(cls.org)
+        cls.group = MeetingGroup.objects.create(meeting=cls.meeting, title="G")
+        cls.poll = Poll.objects.create(method_name="simple", meeting=cls.meeting)
+
+    def setUp(self):
+        from social_django.models import UserSocialAuth
+
+        from voteit.meeting.models import GroupMembership
+        from voteit.poll.models import Vote
+
+        self.source, self.target = _mk_pair(self.org)
+        self.admin = _mk_user(self.org, "merging-admin")
+        self.meeting.add_roles(self.source, "pa")
+        self.membership = GroupMembership.objects.create(
+            meeting_group=self.group, user=self.source
+        )
+        # bulk_create skips the electoral register check in save()
+        (self.vote,) = Vote.objects.bulk_create(
+            [Vote(user=self.source, poll=self.poll, abstain=True)]
+        )
+        self.social = UserSocialAuth.objects.create(
+            user=self.source, provider="scoutid", uid="1234567"
+        )
+
+    def _entries(self, merger):
+        from auditlog.models import LogEntry
+
+        return LogEntry.objects.filter(cid=merger.cid)
+
+    def _for(self, entries, obj):
+        from auditlog.models import LogEntry
+
+        return entries.filter(
+            content_type__model=obj._meta.model_name,
+            object_pk=str(obj.pk),
+            action=LogEntry.Action.UPDATE,
+        )
+
+    def test_summary_on_both_accounts(self):
+        merger = UserMerger(self.source, self.target, actor=self.admin)
+        merger.run()
+        entries = self._entries(merger)
+        merged_from = self._for(entries, self.target).get()
+        self.assertEqual(
+            {"merged_from": ["None", str(self.source.pk)]}, merged_from.changes_dict
+        )
+        self.assertEqual(self.org.pk, merged_from.additional_data["o"])
+        self.assertEqual(self.source.pk, merged_from.additional_data["merge"]["source"])
+        source_entries = self._for(entries, self.source)
+        self.assertEqual(
+            [
+                {"is_active": ["True", "False"]},
+                {"merged_into": ["None", str(self.target.pk)]},
+            ],
+            [entry.changes_dict for entry in source_entries.order_by("pk")],
+        )
+
+    def test_moved_rows_are_logged(self):
+        merger = UserMerger(self.source, self.target)
+        merger.run()
+        entries = self._entries(merger)
+        expected = {"user": [str(self.source.pk), str(self.target.pk)]}
+        for obj in (self.membership, self.vote, self.social):
+            with self.subTest(obj.__class__.__name__):
+                self.assertEqual(expected, self._for(entries, obj).get().changes_dict)
+
+    def test_every_entry_has_the_actor(self):
+        merger = UserMerger(self.source, self.target, actor=self.admin)
+        merger.run()
+        entries = self._entries(merger)
+        # Role signals write some of these, the merger the rest
+        self.assertTrue(entries.filter(content_type__model="meetingroles").exists())
+        self.assertEqual({self.admin.pk}, set(entries.values_list("actor", flat=True)))
+
+    def test_context_is_restored(self):
+        from auditlog.cid import correlation_id
+
+        from voteit.core.user_merger import _merge_actor
+
+        token = correlation_id.set("outer")
+        try:
+            UserMerger(self.source, self.target, actor=self.admin).run()
+            self.assertEqual("outer", correlation_id.get())
+            self.assertIsNone(_merge_actor.get())
+        finally:
+            correlation_id.reset(token)
+
+    def test_dry_run_logs_nothing(self):
+        merger = UserMerger(self.source, self.target, dry_run=True)
+        merger.run()
+        self.assertFalse(self._entries(merger).exists())
+
+    def test_disabled_auditlog_is_respected(self):
+        from auditlog.context import disable_auditlog
+
+        merger = UserMerger(self.source, self.target)
+        with disable_auditlog():
+            merger.run()
+        self.assertFalse(self._entries(merger).exists())
+
+    def test_admin_merge_is_attributed_to_the_admin(self):
+        from auditlog.models import LogEntry
+        from django.contrib.auth import get_user_model
+        from django.urls import reverse
+
+        superuser = get_user_model().objects.create_superuser(username="trail-admin")
+        self.client.force_login(superuser)
+        self.client.post(
+            reverse("admin:core_user_merge_confirm"),
+            {"source_pk": self.source.pk, "target_pk": self.target.pk, "confirm": "on"},
+        )
+        entry = LogEntry.objects.get(changes__has_key="merged_from")
+        self.assertEqual(superuser, entry.actor)

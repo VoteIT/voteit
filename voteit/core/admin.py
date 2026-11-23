@@ -21,6 +21,7 @@ from auditlog.models import LogEntry
 from voteit.core.models import User
 from voteit.messaging.admin import stale_after
 from voteit.messaging.models import Connection
+from voteit.core.user_merger import pick_merge_target
 from voteit.core.user_merger import user_activity_score
 from voteit.core.user_merger import UserMerger
 from voteit.meeting.models import Meeting
@@ -213,15 +214,6 @@ class LinkedFilter(admin.SimpleListFilter):
                 return queryset.filter(pk__in=self._same_person_pks())
 
 
-def _pick_source_target(user_a, user_b):
-    """Return (source, target) — least active user becomes source."""
-    score = user_activity_score
-    score_a, score_b = score(user_a), score(user_b)
-    if score_a <= score_b:
-        return user_a, user_b, score_a, score_b
-    return user_b, user_a, score_b, score_a
-
-
 class MergeUsersForm(forms.Form):
     source_pk = forms.IntegerField(widget=forms.HiddenInput)
     target_pk = forms.IntegerField(widget=forms.HiddenInput)
@@ -281,7 +273,9 @@ class UserAdmin(DefaultUserAdmin):
                 messages.ERROR,
             )
             return
-        source, target, score_src, score_tgt = _pick_source_target(*users)
+        target = pick_merge_target(users)
+        source = users[1] if target == users[0] else users[0]
+        score_src, score_tgt = user_activity_score(source), user_activity_score(target)
         url = reverse("admin:core_user_merge_confirm")
         return HttpResponseRedirect(
             f"{url}?source={source.pk}&target={target.pk}"
@@ -338,7 +332,11 @@ class UserAdmin(DefaultUserAdmin):
             form = MergeUsersForm(request.POST)
             if form.is_valid():
                 real_merger = UserMerger(
-                    source=source, target=target, dry_run=False, same_person=True
+                    source=source,
+                    target=target,
+                    dry_run=False,
+                    same_person=True,
+                    actor=request.user,
                 )
                 try:
                     log = real_merger.run()

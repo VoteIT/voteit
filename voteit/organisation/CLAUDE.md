@@ -48,6 +48,11 @@ Look one up with `organisation.get_provider(provider_id)`, which raises `OAuth2P
 
 The `backend` property returns the backend class for `provider_id`, or `None` when it is not in `AUTHENTICATION_BACKENDS`. It is the single lookup point.
 
+`UserSocialAuth` (social_django's) is registered with auditlog at the bottom of `models.py`, on
+`provider`, `uid` and `user` only, never `extra_data`, which holds tokens. That gives a history
+of login methods being connected, disconnected and moved between accounts, uids such as
+Scoutnet member numbers included. Its `get_additional_data` is attached there too, for `o`.
+
 `OAuth2Provider.visible_for(organisation)` returns the login options to offer: `hidden` rows and rows with no enabled backend dropped, `primary` first, the rest by title lowercased. Sorting is in Python because the title comes from the backend class, not the row. `hidden` only affects this list — such a provider still logs in fine, which is what you want for something reached by a hint rather than a button.
 
 ### GlobalTermsOfService
@@ -156,6 +161,10 @@ partial: the accounts on an address can change while the question is open.
 Answering does not happen here. The client sends the person to
 `resume_url?partial_token=…&link_account=<pk|new>` and the pipeline finishes the login.
 
+### `IdentityAccountOptionsViewSet` (`/api/identity-account-options/`)
+
+The accounts a login paused by `resolve_identity_accounts` reaches. `AllowAny`, same reasoning as above; only idproxy partials are answered. `GET /?partial_token=…` returns `provider`, `resume_url`, `can_merge`, `merge_blocked_reason` and `accounts`: pk, name, userid, email, last sign-in and upcoming / ongoing meetings (`{pk, title, state}`). Recomputed, never read from the partial. The client resumes with `choose_account=<pk>` or `merge_accounts=1`.
+
 ### Login methods (on `UserView`, `voteit/core/rest_api/views.py`)
 
 The connect flow needs almost no machinery: a signed-in user visiting
@@ -236,6 +245,8 @@ Users may change their names locally (`UpdateUserSerializer`), so `SOCIAL_AUTH_I
 
   Every other backend returns early, resolving by `(provider, uid)` alone. None of the above applies to them: `identity_id` is not their namespace.
 
+  When the login reaches **more than one** active account (`find_identity_accounts`: holders of the identity plus the credential's owner), it picks nobody and logs nobody in. It returns `identity_accounts` for the next step.
+- `resolve_identity_accounts` — right after `social_user`, id proxy only. Accounts with `user_activity_score == 0` are merged silently into the account `voteit.core.user_merger.pick_merge_target` picks, unless any of the accounts is elevated: a merge moves every login method onto the target, so nothing reaches a manager's account without being asked. If more than one is left, it is a `@partial` step that pauses and redirects to `CHOOSE_ACCOUNT_URL`. Resuming with `choose_account=<pk>` logs in that account (only if it is still one of them); the duplicates stay and the question comes back next login. `merge_accounts=1` merges everything into the target, unless `why_not_mergeable` says no: an elevated account, or `merge_conflicts` (more than one account voted, is in an electoral register or a meeting group in the **same meeting**, colliding or not). A refused or failed merge is `logger.error`ed and redirects back with `merge_refused=1`.
 - `create_user` — creates a new user scoped to `backend.organisation`, passing `identity_id=uid` **only for `idproxy`**; an account created by any other backend has no `identity_id` and is reached through its `UserSocialAuth`. It takes every `SOCIAL_AUTH_USER_FIELDS` value the provider sent (names and `img_url` included) and generates the `userid` up front, so a new user is saved once — `user_details` then finds nothing to change. Values the provider left out (`None`) fall back to the model default.
 - `ensure_userid` — generates a slugified `userid` from first/last name for an existing user that has none. Deduplicates by appending a suffix.
 - `inherit_users` — maintains `identity_id` for `idproxy` only: it overwrites when the uid has changed, and `extra_identity_ids` in the response updates all same-org active users carrying those IDs to share the authenticated user's `identity_id`. Returns immediately for every other backend — see "`identity_id` belongs to the id proxy" below.

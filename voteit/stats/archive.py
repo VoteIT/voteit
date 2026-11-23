@@ -42,6 +42,9 @@ FK_KEYS = frozenset(
         "context",
         "meeting",
         "meeting_group",
+        # User pks, written by voteit.core.user_merger
+        "merged_from",
+        "merged_into",
         "organisation",
         "poll",
         "room",

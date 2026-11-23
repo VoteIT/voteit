@@ -9,11 +9,18 @@ from django.utils.dateparse import parse_datetime
 from django.utils.timezone import is_aware
 from social_core.exceptions import AuthPolicyError
 from social_core.pipeline.partial import partial
+from django.db import models
 from django.utils.translation import gettext as _
 from social_django.models import UserSocialAuth
 
 from voteit.core.loggers import log_auth
 from voteit.core.removal import abort_removal_path
+from voteit.core.user_merger import merge_conflicts
+from voteit.core.user_merger import pick_merge_target
+from voteit.core.user_merger import user_activity_score
+from voteit.core.user_merger import log_reassignment
+from voteit.core.user_merger import UserMerger
+from voteit.meeting.models import Meeting
 from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation.matching import find_candidates
 from voteit.organisation.matching import is_elevated
@@ -69,7 +76,29 @@ def _transfer_social_auths(from_user, to_user, provider: str | None = None):
     qs = UserSocialAuth.objects.filter(user=from_user)
     if provider is not None:
         qs = qs.filter(provider=provider)
+    moved = list(qs)
     qs.update(user=to_user)
+    for social in moved:
+        log_reassignment(social, "user", from_user, to_user)
+
+
+def find_identity_accounts(organisation, uid: str) -> list:
+    """
+    Active accounts in this organisation that an id proxy login with ``uid``
+    reaches: the ones holding the identity, and the one holding the credential.
+    """
+    if not uid:
+        # identity_id=None would match every account without one.
+        return []
+    return list(
+        organisation.users.filter(
+            models.Q(identity_id=uid)
+            | models.Q(social_auth__provider=IDPROXY_PROVIDER, social_auth__uid=uid),
+            is_active=True,
+        )
+        .distinct()
+        .order_by("pk")
+    )
 
 
 def social_user(backend, uid, user=None, *args, id_key="", **kwargs):
@@ -92,7 +121,18 @@ def social_user(backend, uid, user=None, *args, id_key="", **kwargs):
     """
     provider = backend.name
     social = backend.strategy.storage.user.get_social_auth(provider, uid, id_key=id_key)
-    if provider != IDPROXY_PROVIDER:
+    if provider == IDPROXY_PROVIDER:
+        accounts = find_identity_accounts(backend.organisation, uid)
+        if len(accounts) > 1:
+            # Nobody is picked or logged in here, resolve_identity_accounts decides.
+            return {
+                "social": social,
+                "user": user,
+                "identity_accounts": [account.pk for account in accounts],
+                "is_new": False,
+                "new_association": social is None,
+            }
+    else:
         if social:
             if user and social.user != user:
                 # Someone else's session is open in this browser. The credential
@@ -241,6 +281,143 @@ LINK_ACCOUNT_FIELD = "link_account"
 LINK_ACCOUNT_NEW = "new"
 #: Field the resume request carries the accepted terms of service pk in.
 ACCEPT_TOS_FIELD = "accept_tos"
+#: Field the resume request carries the account picked among duplicates in.
+CHOOSE_ACCOUNT_FIELD = "choose_account"
+#: Field asking to merge the duplicates instead of picking one.
+MERGE_ACCOUNTS_FIELD = "merge_accounts"
+
+
+def why_not_mergeable(accounts: list) -> str | None:
+    """
+    Why these accounts can't be merged by their owner, or None if they can.
+    """
+    if any(is_elevated(account) for account in accounts):
+        return _(
+            "One of these accounts manages the organisation, so they can't be "
+            "merged here. Contact VoteIT to have them merged."
+        )
+    if conflicts := merge_conflicts(accounts):
+        titles = ", ".join(
+            Meeting.objects.filter(pk__in=conflicts)
+            .order_by("title")
+            .values_list("title", flat=True)
+        )
+        return _(
+            "More than one of these accounts has voted, is in an electoral "
+            "register or in a group in the same meeting: %(meetings)s"
+        ) % {"meetings": titles}
+    return None
+
+
+def _merge_into(backend, sources: list, target) -> None:
+    for source in sources:
+        # The id proxy just proved this person holds the identity, and every
+        # account here holds that identity or its credential.
+        UserMerger(source, target, same_person=True, actor=target).run()
+        log_auth(
+            "Duplicate account merged at login",
+            request=backend.strategy.request,
+            for_user=target,
+            context=backend.organisation,
+            merged_user=source.pk,
+        )
+
+
+def _settle(backend, social, session_user, chosen) -> dict:
+    """
+    Continue the login as ``chosen``, with the credential on it.
+    """
+    if social is not None and social.user_id != chosen.pk:
+        previous = social.user
+        social.user = chosen
+        social.save()
+        if not previous.is_active:
+            _transfer_social_auths(previous, chosen, IDPROXY_PROVIDER)
+    if session_user is not None and session_user.pk != chosen.pk:
+        _reauth_user(backend, chosen)
+    return {
+        "user": chosen,
+        "social": social,
+        "is_new": False,
+        "new_association": social is None,
+        "identity_accounts": None,
+    }
+
+
+def _choose_account_url(token: str, merge_refused: bool = False) -> str:
+    base = getattr(settings, "CHOOSE_ACCOUNT_URL", "/choose-account")
+    query = {"partial_token": token}
+    if merge_refused:
+        query["merge_refused"] = "1"
+    return f"{base}?{urlencode(query)}"
+
+
+@partial
+def resolve_identity_accounts(
+    *args,
+    strategy,
+    backend,
+    uid,
+    current_partial,
+    user=None,
+    social=None,
+    identity_accounts=None,
+    **kwargs,
+):
+    """
+    One id proxy identity, several active accounts in this organisation.
+
+    Accounts nobody has used are merged away silently, unless one of the
+    accounts is elevated. If more than one is left, the login **pauses** and the person picks one, or asks to merge them.
+    A merge is refused when the accounts are elevated or have crucial data in
+    the same meeting (see ``merge_conflicts``): that is logged as an error and
+    the person is asked to pick one instead.
+    """
+    if not identity_accounts:
+        return
+    # Recomputed, the accounts may have changed while the question was open.
+    accounts = find_identity_accounts(backend.organisation, uid)
+    if not accounts:
+        return {"user": social.user if social else None, "identity_accounts": None}
+    target = pick_merge_target(accounts, user)
+    # A merge moves every login method onto the target, so nothing is merged
+    # into a manager's account without anyone being asked.
+    unused = [
+        account
+        for account in accounts
+        if account != target and user_activity_score(account) == 0
+    ]
+    if unused and not any(is_elevated(account) for account in accounts):
+        _merge_into(backend, unused, target)
+        accounts = [account for account in accounts if account not in unused]
+    if len(accounts) == 1:
+        return _settle(backend, social, user, accounts[0])
+    answer = strategy.request_data()
+    if picked := answer.get(CHOOSE_ACCOUNT_FIELD):
+        # Only counts if it is still one of the accounts this login reaches.
+        chosen = {str(account.pk): account for account in accounts}.get(str(picked))
+        if chosen is not None:
+            return _settle(backend, social, user, chosen)
+    elif answer.get(MERGE_ACCOUNTS_FIELD):
+        reason = why_not_mergeable(accounts)
+        if reason is None:
+            try:
+                _merge_into(backend, [a for a in accounts if a != target], target)
+            except Exception as exc:
+                reason = str(exc)
+            else:
+                return _settle(backend, social, user, target)
+        logger.error(
+            "Merge of duplicate accounts refused at login. Organisation: %s, "
+            "users: %s, reason: %s",
+            backend.organisation.pk,
+            [account.pk for account in accounts],
+            reason,
+        )
+        return strategy.redirect(
+            _choose_account_url(current_partial.token, merge_refused=True)
+        )
+    return strategy.redirect(_choose_account_url(current_partial.token))
 
 
 def _elevated_message(backend, candidate) -> str:

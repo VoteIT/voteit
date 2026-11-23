@@ -337,8 +337,34 @@ the duplicates this rollout produces. A human confirming both rows in the admin 
 override stands for. Never set it from a guess.
 
 `user_activity_score(user)` counts meeting roles, votes, proposals and discussion posts. A
-zero means nothing of the person's own is on the row; the admin uses it to pick which of two
-accounts becomes the source.
+zero means nothing of the person's own is on the row.
+
+`pick_merge_target(users, session_user=None)` is the one rule for which account the others are
+merged into, shared by the admin merge and the login pipeline: elevated (org roles, staff,
+superuser) first, then most activity, then the signed-in account, then the latest login.
+
+**Audit trail.** The merger moves most rows with `update()`, which sends no signals, so it
+writes its own auditlog entries:
+- `log_reassignment(obj, field, old, new)` -- an UPDATE on each moved row of a registered
+  model, e.g. `{"user": [old pk, new pk]}`. Electoral registers get `voter`, speaker lists
+  `speaker`. Also used by `pipeline._transfer_social_auths`.
+- One summary entry per account: `{"merged_from": ["None", source pk]}` on the target,
+  `{"merged_into": ["None", target pk]}` on the source, with a summary under
+  `additional_data["merge"]`. Only pks in `changes`, which is what `voteit.stats.archive` keeps.
+- Every entry of one merge, the ones role signals write included, shares the correlation id
+  `merger.cid` and gets `actor` (the admin, or the person merging at login). Both are set with
+  `ContextVar.set`/`reset` and a `pre_save` receiver on `LogEntry`, not auditlog's
+  `set_actor()`/`set_extra_data()`: those don't restore the previous context on exit and would
+  drop the actor the middleware set for the rest of the request.
+- Nothing is written for a dry run or under `disable_auditlog()`.
+
+Group memberships are moved first, with `update()` so role and votes stay: deleting the
+source's `MeetingRoles` afterwards cascades into its memberships
+(`meeting.signals.remove_group_memberships`). One in a group the target is already in is skipped.
+
+`crucial_meetings(user)` / `merge_conflicts(users)` — meetings where an account voted, is in an
+electoral register or a meeting group. Two accounts with crucial data in the same meeting
+must not be merged by their owner, see `resolve_identity_accounts` in `voteit.organisation`.
 
 ## Middleware (`middleware.py`)
 

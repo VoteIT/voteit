@@ -7,11 +7,13 @@ from typing import TYPE_CHECKING
 
 from auditlog.registry import auditlog
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
 from django.utils.timezone import now
 from social_core.backends.utils import load_backends
+from social_django.models import UserSocialAuth
 
 from voteit.core.abcs import OrganisationContext
 from voteit.core.fields import RichTextField
@@ -420,3 +422,18 @@ class UserAccept(models.Model):
 
     # Type annotations
     objects: models.Manager
+
+
+def _social_auth_additional_data(self) -> dict:
+    # Within a cascading user delete the user may already be gone.
+    try:
+        org_id = self.user.organisation_id
+    except ObjectDoesNotExist:
+        org_id = None
+    return {"o": org_id} if org_id else {}
+
+
+# A history of login methods being connected, disconnected and moved between
+# accounts. Never extra_data: it holds the provider's tokens.
+UserSocialAuth.get_additional_data = _social_auth_additional_data
+auditlog.register(UserSocialAuth, include_fields=["provider", "uid", "user"])

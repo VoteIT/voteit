@@ -64,3 +64,59 @@ class OAuth2ProviderTests(TestCase):
         self.assertIsNone(provider.backend)
         with dummy_backend_enabled():
             self.assertEqual(DUMMY_PROVIDER, provider.backend.name)
+
+
+class UserSocialAuthAuditlogTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.org = Organisation.objects.create()
+        cls.user = cls.org.users.create(username="kim")
+
+    def _entries(self, social):
+        from auditlog.models import LogEntry
+
+        return LogEntry.objects.get_for_object(social)
+
+    def test_connect_is_logged_without_extra_data(self):
+        from social_django.models import UserSocialAuth
+
+        social = UserSocialAuth.objects.create(
+            user=self.user,
+            provider="scoutid",
+            uid="1234567",
+            extra_data={"access_token": "secret"},
+        )
+        entry = self._entries(social).get()
+        self.assertEqual(
+            {
+                "provider": ["None", "scoutid"],
+                "uid": ["None", "1234567"],
+                "user": ["None", str(self.user.pk)],
+            },
+            entry.changes_dict,
+        )
+        self.assertEqual({"o": self.org.pk}, entry.additional_data)
+
+    def test_extra_data_changes_are_not_logged(self):
+        from social_django.models import UserSocialAuth
+
+        social = UserSocialAuth.objects.create(
+            user=self.user, provider="scoutid", uid="1234567"
+        )
+        social.set_extra_data({"access_token": "new"})
+        self.assertEqual(1, self._entries(social).count())
+
+    def test_transfer_between_accounts_is_logged(self):
+        from social_django.models import UserSocialAuth
+
+        from voteit.organisation.pipeline import _transfer_social_auths
+
+        other = self.org.users.create(username="kim2")
+        social = UserSocialAuth.objects.create(
+            user=self.user, provider="scoutid", uid="1234567"
+        )
+        _transfer_social_auths(self.user, other)
+        latest = self._entries(social).first()
+        self.assertEqual(
+            {"user": [str(self.user.pk), str(other.pk)]}, latest.changes_dict
+        )

@@ -15,6 +15,7 @@ from voteit.organisation.models import GlobalTermsOfService
 from voteit.organisation.models import Organisation
 from voteit.organisation.models import UserAccept
 from voteit.organisation.pipeline import _transfer_social_auths
+from voteit.organisation.pipeline import CHOOSE_ACCOUNT_FIELD
 from voteit.organisation.pipeline import CONNECT_INTENT_SESSION_KEY
 from voteit.organisation.pipeline import ACCEPT_TOS_FIELD
 from voteit.organisation.pipeline import ensure_userid
@@ -22,6 +23,8 @@ from voteit.organisation.pipeline import inherit_users
 from voteit.organisation.pipeline import LINK_ACCOUNT_FIELD
 from voteit.organisation.pipeline import LINK_ACCOUNT_NEW
 from voteit.organisation.pipeline import match_existing_user
+from voteit.organisation.pipeline import MERGE_ACCOUNTS_FIELD
+from voteit.organisation.pipeline import resolve_identity_accounts
 from voteit.organisation.pipeline import require_connect_intent
 from voteit.organisation.pipeline import require_tos_accept
 from voteit.organisation.pipeline import stop_if_removal_requested
@@ -828,3 +831,198 @@ class StopIfRemovalRequestedTests(TestCase):
         strategy = self._strategy(self.user)
         stop_if_removal_requested(strategy, None, self.user)
         logout.assert_called_once_with(strategy.request)
+
+
+class ResolveIdentityAccountsTests(TestCase):
+    """
+    Several active accounts on one id proxy identity: nothing is picked
+    silently any more.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.meeting.models import Meeting
+        from voteit.poll.models import Poll
+
+        cls.org = Organisation.objects.create()
+        cls.meeting = Meeting.objects.create(organisation=cls.org, title="Same")
+        cls.other_meeting = Meeting.objects.create(organisation=cls.org)
+        cls.poll = Poll.objects.create(method_name="simple", meeting=cls.meeting)
+        cls.second_poll = Poll.objects.create(method_name="simple", meeting=cls.meeting)
+
+    def _make_user(self, username, used_in=None, **kwargs):
+        kwargs.setdefault("identity_id", "uid-1")
+        user = self.org.users.create(username=username, **kwargs)
+        if used_in is not None:
+            used_in.add_roles(user, "pa")
+        return user
+
+    def _vote(self, user, poll):
+        from voteit.poll.models import Vote
+
+        # bulk_create skips the electoral register check in save()
+        Vote.objects.bulk_create([Vote(user=user, poll=poll, abstain=True)])
+
+    def _backend(self):
+        backend = MagicMock()
+        backend.name = IDPROXY_PROVIDER
+        backend.organisation = self.org
+        backend.strategy.storage.user.get_social_auth.return_value = None
+        return backend
+
+    def _run(self, answer=None, user=None):
+        backend = self._backend()
+        found = social_user(backend=backend, uid="uid-1", user=user)
+        self.strategy = MagicMock()
+        self.strategy.get_storage.return_value = self.strategy.storage
+        self.strategy.storage.partial.prepare.return_value.token = "a-token"
+        self.strategy.request_data.return_value = answer or {}
+        with patch("voteit.organisation.pipeline._reauth_user") as self.reauth:
+            return resolve_identity_accounts(
+                strategy=self.strategy,
+                backend=backend,
+                uid="uid-1",
+                pipeline_index=0,
+                **found,
+            )
+
+    def _asked(self) -> str:
+        self.strategy.redirect.assert_called_once()
+        return self.strategy.redirect.call_args.args[0]
+
+    @patch("voteit.organisation.pipeline._reauth_user")
+    def test_single_account_is_left_to_social_user(self, _reauth):
+        only = self._make_user("only")
+        found = social_user(backend=self._backend(), uid="uid-1", user=None)
+        self.assertEqual(only, found["user"])
+        self.assertNotIn("identity_accounts", found)
+
+    def test_unused_account_is_merged_away(self):
+        used = self._make_user("used", used_in=self.meeting)
+        unused = self._make_user("unused")
+        result = self._run()
+        self.assertEqual(used, result["user"])
+        unused.refresh_from_db()
+        self.assertFalse(unused.is_active)
+        self.strategy.redirect.assert_not_called()
+
+    def test_used_accounts_ask(self):
+        self._make_user("a", used_in=self.meeting)
+        self._make_user("b", used_in=self.other_meeting)
+        self._run()
+        self.assertEqual("/choose-account?partial_token=a-token", self._asked())
+
+    def test_choose_account(self):
+        self._make_user("a", used_in=self.meeting)
+        b = self._make_user("b", used_in=self.other_meeting)
+        result = self._run({CHOOSE_ACCOUNT_FIELD: str(b.pk)})
+        self.assertEqual(b, result["user"])
+        self.assertTrue(self.org.users.get(username="a").is_active)
+
+    def test_choose_account_outside_the_set_asks_again(self):
+        self._make_user("a", used_in=self.meeting)
+        self._make_user("b", used_in=self.other_meeting)
+        stranger = self._make_user("stranger", identity_id="other")
+        self._run({CHOOSE_ACCOUNT_FIELD: str(stranger.pk)})
+        self.assertIn("partial_token=a-token", self._asked())
+
+    def test_merge_different_meetings(self):
+        a = self._make_user("a", used_in=self.meeting)
+        b = self._make_user("b", used_in=self.other_meeting)
+        self._vote(a, self.poll)
+        result = self._run({MERGE_ACCOUNTS_FIELD: "1"})
+        target = result["user"]
+        self.assertEqual(a, target)
+        b.refresh_from_db()
+        self.assertFalse(b.is_active)
+        self.assertTrue(self.meeting.has_roles(target, "pa"))
+        self.assertTrue(self.other_meeting.has_roles(target, "pa"))
+
+    def test_merge_at_login_is_attributed_to_the_person(self):
+        from auditlog.models import LogEntry
+
+        a = self._make_user("a", used_in=self.meeting)
+        self._make_user("b", used_in=self.other_meeting)
+        self._vote(a, self.poll)
+        self._run({MERGE_ACCOUNTS_FIELD: "1"})
+        entry = LogEntry.objects.get(changes__has_key="merged_from")
+        self.assertEqual(a, entry.actor)
+
+    def test_merge_same_meeting_roles_only(self):
+        a = self._make_user("a", used_in=self.meeting)
+        b = self._make_user("b", used_in=self.meeting)
+        result = self._run({MERGE_ACCOUNTS_FIELD: "1"})
+        self.assertIn(result["user"], (a, b))
+        self.assertEqual(1, self.org.users.filter(is_active=True).count())
+
+    def test_merge_refused_votes_in_same_meeting(self):
+        a = self._make_user("a", used_in=self.meeting)
+        b = self._make_user("b", used_in=self.meeting)
+        self._vote(a, self.poll)
+        self._vote(b, self.second_poll)
+        with self.assertLogs("voteit.organisation.pipeline", "ERROR"):
+            self._run({MERGE_ACCOUNTS_FIELD: "1"})
+        self.assertEqual(
+            "/choose-account?partial_token=a-token&merge_refused=1", self._asked()
+        )
+        self.assertEqual(2, self.org.users.filter(is_active=True).count())
+
+    def test_merge_refused_for_elevated(self):
+        a = self._make_user("a", used_in=self.meeting)
+        self._make_user("b", used_in=self.other_meeting)
+        self.org.add_roles(a, ROLE_ORG_MANAGER)
+        with self.assertLogs("voteit.organisation.pipeline", "ERROR"):
+            self._run({MERGE_ACCOUNTS_FIELD: "1"})
+        self.assertIn("merge_refused=1", self._asked())
+
+    def test_unused_elevated_account_is_kept(self):
+        self._make_user("a", used_in=self.meeting)
+        manager = self._make_user("manager")
+        self.org.add_roles(manager, ROLE_ORG_MANAGER)
+        self._run()
+        self.assertIn("partial_token=a-token", self._asked())
+        manager.refresh_from_db()
+        self.assertTrue(manager.is_active)
+
+    def test_nothing_is_merged_into_an_elevated_account_silently(self):
+        """
+        A merge moves every login method onto the target, so an unused
+        duplicate's credentials would start reaching the manager's account.
+        """
+        manager = self._make_user("manager", used_in=self.meeting)
+        self.org.add_roles(manager, ROLE_ORG_MANAGER)
+        unused = self._make_user("unused")
+        UserSocialAuth.objects.create(user=unused, uid="scout-1", provider="scoutid")
+        self._run()
+        self.assertIn("partial_token=a-token", self._asked())
+        unused.refresh_from_db()
+        self.assertTrue(unused.is_active)
+        self.assertFalse(manager.social_auth.filter(provider="scoutid").exists())
+
+    def test_superuser_is_never_merged_silently(self):
+        superuser = self._make_user("super", is_superuser=True)
+        self._make_user("unused")
+        self._make_user("used", used_in=self.meeting)
+        self._run()
+        self.assertIn("partial_token=a-token", self._asked())
+        self.assertEqual(3, self.org.users.filter(is_active=True).count())
+        superuser.refresh_from_db()
+        self.assertTrue(superuser.is_active)
+
+    def test_superuser_merge_is_refused(self):
+        self._make_user("super", is_superuser=True, used_in=self.other_meeting)
+        self._make_user("used", used_in=self.meeting)
+        with self.assertLogs("voteit.organisation.pipeline", "ERROR"):
+            self._run({MERGE_ACCOUNTS_FIELD: "1"})
+        self.assertIn("merge_refused=1", self._asked())
+        self.assertEqual(2, self.org.users.filter(is_active=True).count())
+
+    def test_credential_owner_without_identity_counts(self):
+        a = self._make_user("a", used_in=self.meeting)
+        holder = self._make_user("holder", identity_id=None)
+        UserSocialAuth.objects.create(user=holder, uid="uid-1", provider="idproxy")
+        result = self._run()
+        self.assertEqual(a, result["user"])
+        holder.refresh_from_db()
+        self.assertFalse(holder.is_active)
+        self.assertTrue(a.social_auth.filter(uid="uid-1").exists())

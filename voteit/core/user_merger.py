@@ -1,12 +1,19 @@
 from __future__ import annotations
 
 import logging
+from contextvars import ContextVar
 from dataclasses import dataclass
 from dataclasses import field
 from typing import TYPE_CHECKING
+from uuid import uuid4
 
+from auditlog.cid import correlation_id
+from auditlog.context import auditlog_disabled
+from auditlog.registry import auditlog
 from django.db import transaction
 from django.db.models import UniqueConstraint
+from django.db.models.signals import pre_save
+from django.dispatch import receiver
 
 if TYPE_CHECKING:
     from voteit.core.models import User
@@ -20,6 +27,38 @@ _EXPLICITLY_HANDLED = frozenset(
         ("active", "activeuser", "user"),
     }
 )
+
+
+#: Actor of every auditlog entry written while a merge runs, including the
+#: ones role signals write. auditlog's own set_actor() doesn't restore the
+#: previous context on exit, so inside a request it would drop the actor the
+#: middleware set.
+_merge_actor: ContextVar[User | None] = ContextVar("voteit_merge_actor", default=None)
+
+
+@receiver(pre_save, sender="auditlog.LogEntry", dispatch_uid="voteit_merge_actor")
+def _set_merge_actor(instance, **kwargs):
+    actor = _merge_actor.get()
+    if actor is not None and instance.actor_id is None:
+        instance.actor = actor
+        instance.actor_email = actor.email
+
+
+def log_reassignment(obj, field_name: str, old: User, new: User) -> None:
+    """
+    Auditlog entry for a row moved from one user to another with update(),
+    which sends no signals for auditlog to pick up.
+    """
+    if auditlog_disabled.get() or not auditlog.contains(obj.__class__):
+        return
+    from auditlog.models import LogEntry
+
+    LogEntry.objects.log_create(
+        obj,
+        force_log=True,
+        action=LogEntry.Action.UPDATE,
+        changes={field_name: [str(old.pk), str(new.pk)]},
+    )
 
 
 def _unique_groups_for_field(model, field_name):
@@ -61,6 +100,64 @@ def user_activity_score(user: User) -> int:
     )
 
 
+def pick_merge_target(users: list[User], session_user: User | None = None) -> User:
+    """
+    The account the others should be merged into: elevated first, then the one
+    with the most activity, the one signed in, and the latest login.
+
+    Used by the admin merge and by the login pipeline alike.
+    """
+    from voteit.organisation.matching import is_elevated
+
+    def key(user):
+        return (
+            is_elevated(user),
+            user_activity_score(user),
+            session_user is not None and user.pk == session_user.pk,
+            user.last_login.timestamp() if user.last_login else 0,
+        )
+
+    return max(users, key=key)
+
+
+def crucial_meetings(user: User) -> set[int]:
+    """
+    Meetings where this account has voted, is in an electoral register, or is
+    in a meeting group. Two accounts sharing one of these must not be merged,
+    even when nothing collides row by row.
+    """
+    from voteit.meeting.models import GroupMembership
+    from voteit.poll.models import ElectoralRegister
+    from voteit.poll.models import Vote
+
+    pks = set(Vote.objects.filter(user=user).values_list("poll__meeting_id", flat=True))
+    pks.update(
+        GroupMembership.objects.filter(user=user).values_list(
+            "meeting_group__meeting_id", flat=True
+        )
+    )
+    pks.update(
+        ElectoralRegister.objects.filter(voter_data__has_key=str(user.pk)).values_list(
+            "meeting_id", flat=True
+        )
+    )
+    pks.discard(None)
+    return pks
+
+
+def merge_conflicts(users: list[User]) -> set[int]:
+    """
+    Meetings where more than one of these accounts has crucial data.
+    """
+    seen: set[int] = set()
+    conflicts: set[int] = set()
+    for user in users:
+        meetings = crucial_meetings(user)
+        conflicts |= seen & meetings
+        seen |= meetings
+    return conflicts
+
+
 @dataclass
 class MergeLog:
     moved: list[str] = field(default_factory=list)
@@ -76,8 +173,11 @@ class UserMerger:
         target: User,
         dry_run: bool = False,
         same_person: bool = False,
+        actor: User | None = None,
     ):
         """
+        :param actor: who merged, for auditlog. The admin, or the person
+            themselves when they merged at login.
         :param same_person: skip the identity_id check, because something else
             has established that these two rows are one person. Only the id
             proxy writes identity_id, so a pair linked through any other
@@ -88,22 +188,65 @@ class UserMerger:
         self.target = target
         self.dry_run = dry_run
         self.same_person = same_person
+        self.actor = actor
+        #: Correlation id on every auditlog entry of this merge.
+        self.cid = f"user-merge-{uuid4().hex}"
         self.log = MergeLog()
 
     def run(self) -> MergeLog:
         self._validate()
-        with transaction.atomic(durable=True):
-            self._handle_meeting_roles()
-            self._handle_organisation_roles()
-            self._handle_active_users()
-            self._handle_electoral_registers()
-            self._handle_generic_fk_relations()
-            self._handle_speaker_list_order()
-            self._handle_generic_m2m_relations()
-            self._deactivate_source()
-            if self.dry_run:
-                transaction.set_rollback(True)
+        cid_token = correlation_id.set(self.cid)
+        actor_token = _merge_actor.set(self.actor)
+        try:
+            with transaction.atomic(durable=True):
+                # Before meeting roles: deleting the source's MeetingRoles cascades
+                # into its group memberships (meeting.signals.remove_group_memberships).
+                self._handle_group_memberships()
+                self._handle_meeting_roles()
+                self._handle_organisation_roles()
+                self._handle_active_users()
+                self._handle_electoral_registers()
+                self._handle_generic_fk_relations()
+                self._handle_speaker_list_order()
+                self._handle_generic_m2m_relations()
+                self._deactivate_source()
+                if self.dry_run:
+                    transaction.set_rollback(True)
+                else:
+                    self._log_merge()
+        finally:
+            _merge_actor.reset(actor_token)
+            correlation_id.reset(cid_token)
         return self.log
+
+    def _log_merge(self) -> None:
+        """
+        One entry on each account, since nothing else says that a merge
+        happened -- the source's own entry only reads as a deactivation.
+        Only pks in changes, see voteit.stats.archive.
+        """
+        if auditlog_disabled.get():
+            return
+        from auditlog.models import LogEntry
+
+        summary = {
+            "source": self.source.pk,
+            "target": self.target.pk,
+            "moved": len(self.log.moved),
+            "merged_roles": len(self.log.merged_roles),
+            "skipped": self.log.skipped,
+        }
+        for user, key, other in (
+            (self.target, "merged_from", self.source),
+            (self.source, "merged_into", self.target),
+        ):
+            LogEntry.objects.log_create(
+                user,
+                force_log=True,
+                action=LogEntry.Action.UPDATE,
+                changes={key: ["None", str(other.pk)]},
+                additional_data={**user.get_additional_data(), "merge": summary},
+            )
 
     def _validate(self) -> None:
         if self.source.pk == self.target.pk:
@@ -131,6 +274,8 @@ class UserMerger:
         from voteit.meeting.models import MeetingRoles
 
         for src in MeetingRoles.objects.filter(user=self.source):
+            # Read before delete() clears it
+            src_pk = src.pk
             has_target = MeetingRoles.objects.filter(
                 user=self.target, context=src.context
             ).exists()
@@ -139,17 +284,45 @@ class UserMerger:
                 src.delete()
             if has_target:
                 self.log.merged_roles.append(
-                    f"MeetingRoles pk={src.pk} (meeting_id={src.context_id}): merged roles into target"
+                    f"MeetingRoles pk={src_pk} (meeting_id={src.context_id}): merged roles into target"
                 )
             else:
                 self.log.moved.append(
-                    f"MeetingRoles pk={src.pk} (meeting_id={src.context_id}) moved"
+                    f"MeetingRoles pk={src_pk} (meeting_id={src.context_id}) moved"
                 )
+
+    def _handle_group_memberships(self) -> None:
+        """
+        Moved with update(), so role and votes stay and no role signals fire.
+        The meeting roles a group role granted move with the MeetingRoles.
+        """
+        from voteit.meeting.models import GroupMembership
+
+        target_groups = set(
+            GroupMembership.objects.filter(user=self.target).values_list(
+                "meeting_group_id", flat=True
+            )
+        )
+        for src in GroupMembership.objects.filter(user=self.source):
+            if src.meeting_group_id in target_groups:
+                self.log.skipped.append(
+                    f"GroupMembership pk={src.pk} (meeting_group_id={src.meeting_group_id}) "
+                    f"skipped: target already a member, removed with the source's meeting roles"
+                )
+                continue
+            if not self.dry_run:
+                GroupMembership.objects.filter(pk=src.pk).update(user=self.target)
+                log_reassignment(src, "user", self.source, self.target)
+            self.log.moved.append(
+                f"GroupMembership pk={src.pk} (meeting_group_id={src.meeting_group_id}) moved"
+            )
 
     def _handle_organisation_roles(self) -> None:
         from voteit.organisation.models import OrganisationRoles
 
         for src in OrganisationRoles.objects.filter(user=self.source):
+            # Read before delete() clears it
+            src_pk = src.pk
             has_target = OrganisationRoles.objects.filter(
                 user=self.target, context=src.context
             ).exists()
@@ -158,11 +331,11 @@ class UserMerger:
                 src.delete()
             if has_target:
                 self.log.merged_roles.append(
-                    f"OrganisationRoles pk={src.pk} (org_id={src.context_id}): merged roles into target"
+                    f"OrganisationRoles pk={src_pk} (org_id={src.context_id}): merged roles into target"
                 )
             else:
                 self.log.moved.append(
-                    f"OrganisationRoles pk={src.pk} (org_id={src.context_id}) moved"
+                    f"OrganisationRoles pk={src_pk} (org_id={src.context_id}) moved"
                 )
 
     def _handle_active_users(self) -> None:
@@ -192,6 +365,7 @@ class UserMerger:
                     ElectoralRegister.objects.filter(pk=er.pk).update(
                         voter_data=new_data
                     )
+                    log_reassignment(er, "voter", self.source, self.target)
                 self.log.moved.append(
                     f"ElectoralRegister pk={er.pk}: voter key moved to target"
                 )
@@ -224,6 +398,7 @@ class UserMerger:
                 else:
                     if not self.dry_run:
                         model.objects.filter(pk=obj.pk).update(**{fname: self.target})
+                        log_reassignment(obj, fname, self.source, self.target)
                     self.log.moved.append(f"{model.__name__}.{fname} pk={obj.pk} moved")
 
     def _handle_speaker_list_order(self) -> None:
@@ -247,6 +422,7 @@ class UserMerger:
             if new_order != sl.order:
                 if not self.dry_run:
                     SpeakerList.objects.filter(pk=sl.pk).update(order=new_order)
+                    log_reassignment(sl, "speaker", self.source, self.target)
                 self.log.moved.append(f"SpeakerList pk={sl.pk}: updated order field")
 
     def _handle_generic_m2m_relations(self) -> None:
