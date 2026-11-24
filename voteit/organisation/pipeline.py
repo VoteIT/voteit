@@ -458,8 +458,20 @@ def resolve_identity_accounts(
             target = pick_merge_target(accounts, user)
             try:
                 _merge_into(backend, [a for a in accounts if a != target], target)
-            except Exception as exc:
+            except ValueError as exc:
+                # UserMerger._validate refused, e.g. another login merged first.
                 reason = str(exc)
+            except Exception:
+                # A bug, not a refusal: keep the traceback, still answer the person.
+                logger.exception(
+                    "Merge of duplicate accounts failed at login. Organisation: %s, "
+                    "users: %s",
+                    backend.organisation.pk,
+                    [account.pk for account in accounts],
+                )
+                return strategy.redirect(
+                    _choose_account_url(current_partial.token, merge_refused=True)
+                )
             else:
                 return _settle(backend, social, user, target)
         logger.error(

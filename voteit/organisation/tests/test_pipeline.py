@@ -967,6 +967,21 @@ class ResolveIdentityAccountsTests(TestCase):
         )
         self.assertEqual(2, self.org.users.filter(is_active=True).count())
 
+    def test_merge_failure_is_logged_with_traceback(self):
+        self._make_user("a", used_in=self.meeting)
+        self._make_user("b", used_in=self.other_meeting)
+        with (
+            patch(
+                "voteit.organisation.pipeline.UserMerger.run",
+                side_effect=RuntimeError("boom"),
+            ),
+            self.assertLogs("voteit.organisation.pipeline", "ERROR") as logs,
+        ):
+            self._run({MERGE_ACCOUNTS_FIELD: "1"})
+        self.assertIn("merge_refused=1", self._asked())
+        self.assertIsNotNone(logs.records[0].exc_info)
+        self.assertEqual(2, self.org.users.filter(is_active=True).count())
+
     def test_merge_refused_for_elevated(self):
         a = self._make_user("a", used_in=self.meeting)
         self._make_user("b", used_in=self.other_meeting)
