@@ -1017,7 +1017,87 @@ class ResolveIdentityAccountsTests(TestCase):
         self.assertIn("merge_refused=1", self._asked())
         self.assertEqual(2, self.org.users.filter(is_active=True).count())
 
-    def test_credential_owner_without_identity_counts(self):
+    def test_credential_owner_without_identity_is_asked_about(self):
+        """
+        The credential may sit on someone else's account. Merging it would
+        hand that account's other login methods to this person.
+        """
+        self._make_user("a", used_in=self.meeting)
+        holder = self._make_user("holder", identity_id=None)
+        UserSocialAuth.objects.create(user=holder, uid="uid-1", provider="idproxy")
+        UserSocialAuth.objects.create(user=holder, uid="scout-1", provider="scoutid")
+        self._run()
+        self.assertIn("partial_token=a-token", self._asked())
+        holder.refresh_from_db()
+        self.assertTrue(holder.is_active)
+        self.assertTrue(holder.social_auth.filter(provider="scoutid").exists())
+
+    def test_credential_owner_without_identity_merge_refused(self):
+        self._make_user("a", used_in=self.meeting)
+        holder = self._make_user(
+            "holder", identity_id="other", used_in=self.other_meeting
+        )
+        UserSocialAuth.objects.create(user=holder, uid="uid-1", provider="idproxy")
+        with self.assertLogs("voteit.organisation.pipeline", "ERROR"):
+            self._run({MERGE_ACCOUNTS_FIELD: "1"})
+        self.assertIn("merge_refused=1", self._asked())
+        self.assertEqual(2, self.org.users.filter(is_active=True).count())
+
+    def test_unused_account_with_removal_requested_is_kept(self):
+        from django.utils.timezone import now
+
+        self._make_user("used", used_in=self.meeting)
+        leaving = self._make_user("leaving", removal_requested=now())
+        self._run()
+        self.assertIn("partial_token=a-token", self._asked())
+        leaving.refresh_from_db()
+        self.assertTrue(leaving.is_active)
+
+    def test_nothing_is_merged_into_an_account_being_removed(self):
+        """
+        Removing it would take the merged votes and login methods with it.
+        """
+        from django.utils.timezone import now
+
+        leaving = self._make_user(
+            "leaving", used_in=self.meeting, removal_requested=now()
+        )
+        unused = self._make_user("unused")
+        UserSocialAuth.objects.create(user=unused, uid="scout-1", provider="scoutid")
+        self._run()
+        self.assertIn("partial_token=a-token", self._asked())
+        unused.refresh_from_db()
+        self.assertTrue(unused.is_active)
+        self.assertFalse(leaving.social_auth.exists())
+
+    def test_merge_refused_with_removal_requested(self):
+        from django.utils.timezone import now
+
+        self._make_user("a", used_in=self.meeting, removal_requested=now())
+        self._make_user("b", used_in=self.other_meeting)
+        with self.assertLogs("voteit.organisation.pipeline", "ERROR"):
+            self._run({MERGE_ACCOUNTS_FIELD: "1"})
+        self.assertIn("merge_refused=1", self._asked())
+        self.assertEqual(2, self.org.users.filter(is_active=True).count())
+
+    def test_unused_merged_while_credential_holder_stays(self):
+        a = self._make_user("a", used_in=self.meeting)
+        unused = self._make_user("unused")
+        holder = self._make_user("holder", identity_id=None)
+        UserSocialAuth.objects.create(user=holder, uid="uid-1", provider="idproxy")
+        UserSocialAuth.objects.create(user=holder, uid="scout-1", provider="scoutid")
+        self._run()
+        self.assertIn("partial_token=a-token", self._asked())
+        unused.refresh_from_db()
+        self.assertFalse(unused.is_active)
+        holder.refresh_from_db()
+        self.assertTrue(holder.is_active)
+        self.assertTrue(a.is_active)
+
+    def test_holder_of_nothing_but_this_credential_is_merged(self):
+        """
+        Nothing of anyone else's is on it, so the credential just moves home.
+        """
         a = self._make_user("a", used_in=self.meeting)
         holder = self._make_user("holder", identity_id=None)
         UserSocialAuth.objects.create(user=holder, uid="uid-1", provider="idproxy")

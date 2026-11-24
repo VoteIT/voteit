@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-21 13:31+0200\n"
+"POT-Creation-Date: 2026-11-23 16:18+0100\n"
 "PO-Revision-Date: 2026-10-21 13:40+0200\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -58,6 +58,14 @@ msgstr "Arkivér"
 msgid "There are ongoing polls"
 msgstr "Der er igangværende afstemninger"
 
+#: core/removal.py:166 core/removal.py:169
+msgid "Your account is marked for removal"
+msgstr "Din konto er markeret til sletning"
+
+#: core/removal.py:265
+msgid "Your account has been removed"
+msgstr "Din konto er blevet slettet"
+
 #: core/rest_api/lock.py:32
 msgid "Operation already in progress."
 msgstr "En handling er allerede i gang."
@@ -66,33 +74,36 @@ msgstr "En handling er allerede i gang."
 msgid "Please wait a few seconds before retrying."
 msgstr "Vent et par sekunder, før du prøver igen."
 
-#: core/rest_api/serializers.py:133
+#: core/rest_api/permissions.py:56
+msgid "Removal of this account has been requested."
+msgstr "Der er anmodet om sletning af denne konto."
+
+#: core/rest_api/serializers.py:135
 msgid "Meeting group doesn't exist"
 msgstr "Gruppen findes ikke"
 
-#: core/rest_api/serializers.py:140
+#: core/rest_api/serializers.py:142
 msgid "You're not a member of this group"
 msgstr "Du er ikke medlem af denne gruppe"
 
-#: core/rest_api/serializers.py:202
+#: core/rest_api/serializers.py:218
 msgid "Email you specified isn't validated. It must exist on your profile."
 msgstr ""
-"Den e-mail, du har angivet, er ikke bekræftet. Den skal findes på din "
-"profil."
+"Den e-mail, du har angivet, er ikke bekræftet. Den skal findes på din profil."
 
-#: core/rest_api/serializers.py:306 invites/rest_api/views.py:532
+#: core/rest_api/serializers.py:347 invites/rest_api/views.py:530
 msgid "Organisation required"
 msgstr "Organisation er påkrævet"
 
-#: core/rest_api/serializers.py:310
+#: core/rest_api/serializers.py:351
 msgid "No such login method here."
 msgstr "Der findes ingen sådan login-metode her."
 
-#: core/rest_api/serializers.py:313
+#: core/rest_api/serializers.py:354
 msgid "That login method is not available."
 msgstr "Den login-metode er ikke tilgængelig."
 
-#: core/rest_api/serializers.py:538
+#: core/rest_api/serializers.py:579
 msgid "You can only pick existing users within this meeting"
 msgstr "Du kan kun vælge eksisterende brugere, som deltager i mødet"
 
@@ -113,7 +124,15 @@ msgstr ""
 "Denne mødegruppe tillader ikke, at du skriver indlæg i dens navn. "
 "(post_as=False)"
 
-#: core/rest_api/views.py:248
+#: core/rest_api/views.py:243
+msgid "Your account is already being removed."
+msgstr "Din konto er allerede ved at blive slettet."
+
+#: core/rest_api/views.py:267
+msgid "The removal of your account was aborted."
+msgstr "Sletningen af din konto blev afbrudt."
+
+#: core/rest_api/views.py:351
 msgid "You can't remove your only way of signing in."
 msgstr "Du kan ikke fjerne din eneste måde at logge ind på."
 
@@ -125,55 +144,87 @@ msgstr "Hjem"
 msgid "This email was sent from:"
 msgstr "Denne e-mail blev sendt fra:"
 
-#: core/validators.py:44 core/validators.py:56
+#: core/templates/voteit/core/removal_completed.html:5
+#: core/templates/voteit/core/removal_requested.html:5
+#: organisation/templates/voteit/organisation/login_method_added.html:5
+#, python-format
+msgid "Hi %(full_name)s!"
+msgstr "Hej %(full_name)s!"
+
+#: core/templates/voteit/core/removal_completed.html:8
+#, python-format
+msgid "Your account at %(org_title)s has been removed, as requested."
+msgstr "Din konto hos %(org_title)s er blevet slettet, som du anmodede om."
+
+#: core/templates/voteit/core/removal_completed.html:12
+msgid "If you log in again, a new account will be created."
+msgstr "Hvis du logger ind igen, oprettes en ny konto."
+
+#: core/templates/voteit/core/removal_requested.html:8
+#, python-format
+msgid ""
+"Your account at %(org_title)s has been marked for removal, as requested."
+msgstr ""
+"Din konto hos %(org_title)s er blevet markeret til sletning, som du anmodede "
+"om."
+
+#: core/templates/voteit/core/removal_requested.html:12
+msgid ""
+"If this wasn't you, or if you've changed your mind, you can abort the removal"
+" here:"
+msgstr ""
+"Hvis det ikke var dig, eller hvis du har fortrudt, kan du afbryde sletningen "
+"her:"
+
+#: core/validators.py:45 core/validators.py:57
 msgid "Image upload is currently unavailable."
 msgstr "Det er i øjeblikket ikke muligt at uploade billeder."
 
-#: core/validators.py:48 core/validators.py:124
+#: core/validators.py:49 core/validators.py:125
 #, python-format
 msgid "File too large. Max size: %s"
 msgstr "Filen er for stor. Maksimal størrelse: %s"
 
-#: core/validators.py:64
+#: core/validators.py:65
 #, python-format
 msgid "Unsupported file type, must be one of: %s."
 msgstr "Filtypen understøttes ikke. Den skal være en af følgende: %s."
 
-#: core/validators.py:133
+#: core/validators.py:134
 msgid "SVG must be UTF-8 encoded."
 msgstr "SVG-filen skal være kodet i UTF-8."
 
-#: core/validators.py:136
+#: core/validators.py:137
 msgid "SVG must not contain a DOCTYPE or entities."
 msgstr "SVG-filen må ikke indeholde DOCTYPE eller entiteter."
 
-#: core/validators.py:139
+#: core/validators.py:140
 msgid "SVG must not contain processing instructions."
 msgstr "SVG-filen må ikke indeholde behandlingsinstruktioner."
 
-#: core/validators.py:149 core/validators.py:151 core/validators.py:156
+#: core/validators.py:150 core/validators.py:152 core/validators.py:157
 msgid "Not a valid SVG file."
 msgstr "Ikke en gyldig SVG-fil."
 
-#: core/validators.py:166 core/validators.py:175
+#: core/validators.py:167 core/validators.py:176
 #, python-format
 msgid "SVG element not allowed: %s"
 msgstr "SVG-elementet er ikke tilladt: %s"
 
-#: core/validators.py:172
+#: core/validators.py:173
 msgid "SVG style must only contain text."
 msgstr "SVG-stilen må kun indeholde tekst."
 
-#: core/validators.py:180 core/validators.py:185
+#: core/validators.py:181 core/validators.py:186
 #, python-format
 msgid "SVG attribute not allowed: %s"
 msgstr "SVG-attributten er ikke tilladt: %s"
 
-#: core/validators.py:187
+#: core/validators.py:188
 msgid "SVG may only link within the file."
 msgstr "SVG-filen må kun linke inden for filen."
 
-#: core/validators.py:194
+#: core/validators.py:195
 msgid "SVG must not reference external resources."
 msgstr "SVG-filen må ikke henvise til eksterne ressourcer."
 
@@ -189,11 +240,11 @@ msgstr "Vent et par sekunder, før du kører en ny import."
 #, python-format
 msgid ""
 "Rows %(first_row)s and %(row_no)s set different '%(column)s' for the same "
-"%(described)s: %(old)s vs %(new)s. The later row would silently overwrite "
-"the earlier one - remove one of them or make the rows agree."
+"%(described)s: %(old)s vs %(new)s. The later row would silently overwrite the"
+" earlier one - remove one of them or make the rows agree."
 msgstr ""
-"Række %(first_row)s og %(row_no)s angiver forskellige ’%(column)s’ for samme"
-" %(described)s: %(old)s mod %(new)s. Den senere række ville stiltiende "
+"Række %(first_row)s og %(row_no)s angiver forskellige ’%(column)s’ for samme "
+"%(described)s: %(old)s mod %(new)s. Den senere række ville stiltiende "
 "overskrive den tidligere - fjern en af dem, eller sørg for at rækkerne "
 "stemmer overens."
 
@@ -257,8 +308,8 @@ msgstr ""
 #: invites/registries.py:224
 #, python-format
 msgid ""
-"The same user data has different roles on rows %(first_row)s and %(row_no)s:"
-" %(values)s"
+"The same user data has different roles on rows %(first_row)s and %(row_no)s: "
+"%(values)s"
 msgstr ""
 "De samme brugerdata har forskellige roller i række %(first_row)s og "
 "%(row_no)s: %(values)s"
@@ -273,8 +324,8 @@ msgstr ""
 
 #: invites/rest_api/import_utils.py:80
 msgid ""
-"Unsupported file format. Upload an Excel file (.xlsx), an ODS spreadsheet, "
-"or a UTF-8 CSV/TSV file."
+"Unsupported file format. Upload an Excel file (.xlsx), an ODS spreadsheet, or"
+" a UTF-8 CSV/TSV file."
 msgstr ""
 "Filformatet understøttes ikke. Upload en Excel-fil (.xlsx), et ODS-regneark "
 "eller en CSV/TSV-fil i UTF-8."
@@ -300,8 +351,7 @@ msgstr ""
 
 #: invites/rest_api/import_utils.py:132
 msgid "The file appears to be corrupt or is not a valid spreadsheet."
-msgstr ""
-"Filen ser ud til at være beskadiget eller er ikke et gyldigt regneark."
+msgstr "Filen ser ud til at være beskadiget eller er ikke et gyldigt regneark."
 
 #: invites/rest_api/import_utils.py:158
 msgid "No worksheet found in the Excel file."
@@ -342,8 +392,8 @@ msgid ""
 "Found existing invites matching only parts of a row. Check for conflicting "
 "data in column(s): %(cols)s"
 msgstr ""
-"Fandt eksisterende invitationer, der kun matcher dele af en række. "
-"Kontrollér for modstridende data i kolonne(r): %(cols)s"
+"Fandt eksisterende invitationer, der kun matcher dele af en række. Kontrollér"
+" for modstridende data i kolonne(r): %(cols)s"
 
 #: invites/rest_api/serializers.py:173
 #, python-format
@@ -351,8 +401,8 @@ msgid ""
 "Your action would downgrade permissions for some moderators. Handle "
 "moderators via participants tab instead. Related to userID(s): %(userids)s"
 msgstr ""
-"Din handling ville nedgradere tilladelserne for nogle moderatorer. Håndtér i"
-" stedet moderatorer via fanen ”Deltagere”. Berørte bruger-ID’er: %(userids)s"
+"Din handling ville nedgradere tilladelserne for nogle moderatorer. Håndtér i "
+"stedet moderatorer via fanen ”Deltagere”. Berørte bruger-ID’er: %(userids)s"
 
 #: invites/rest_api/serializers.py:195
 msgid "The file contains no data rows"
@@ -482,67 +532,102 @@ msgstr "Mødet skal have en gyldig politik for stemmeberettigede"
 msgid "Meeting has ongoing polls - close them first"
 msgstr "Mødet har igangværende afstemninger - luk dem først"
 
-#: organisation/jobs.py:101
+#: organisation/jobs.py:108
 msgid "A new login method was connected"
 msgstr "En ny login-metode er blevet tilknyttet"
 
-#: organisation/jobs.py:105
+#: organisation/jobs.py:112
 msgid "A new login method was connected to your account"
 msgstr "En ny login-metode er blevet tilknyttet din konto"
 
-#: organisation/pipeline.py:46
+#: organisation/pipeline.py:55
 msgid "This organisation is no longer active."
 msgstr "Organisationen er ikke længere aktiv."
 
-#: organisation/pipeline.py:230
+#: organisation/pipeline.py:272
 #, python-format
 msgid ""
-"This %(provider)s login already belongs to another account here. Sign in "
-"with %(provider)s to use that account. To connect it to this account "
-"instead, first remove %(provider)s from the other account."
+"This %(provider)s login already belongs to another account here. Sign in with"
+" %(provider)s to use that account. To connect it to this account instead, "
+"first remove %(provider)s from the other account."
 msgstr ""
 "Dette login med %(provider)s tilhører allerede en anden konto her. Log ind "
 "med %(provider)s for at bruge den konto. Hvis du i stedet vil tilknytte det "
 "til denne konto, skal du først fjerne %(provider)s fra den anden konto."
 
-#: organisation/pipeline.py:261
+#: organisation/pipeline.py:305
 msgid ""
-"You already have an account here that manages the organisation, but it has "
-"no way to sign in. Ask another organisation manager for help."
+"One of these accounts isn't tied to your identity, so they can't be merged "
+"here. Contact VoteIT to have them merged."
 msgstr ""
-"Du har allerede en konto her, som administrerer organisationen, men den har "
-"ingen måde at logge ind på. Bed en anden organisationsadministrator om "
-"hjælp."
+"En af kontoerne er ikke knyttet til din identitet, så de kan ikke lægges "
+"sammen her. Kontakt VoteIT for at få dem lagt sammen."
 
-#: organisation/pipeline.py:266
+#: organisation/pipeline.py:310
+msgid "One of these accounts is about to be removed, so they can't be merged."
+msgstr "En af kontoerne er ved at blive fjernet, så de kan ikke lægges sammen."
+
+#: organisation/pipeline.py:314
+msgid ""
+"One of these accounts manages the organisation, so they can't be merged here."
+" Contact VoteIT to have them merged."
+msgstr ""
+"En af kontoerne administrerer organisationen, så de kan ikke lægges sammen "
+"her. Kontakt VoteIT for at få dem lagt sammen."
+
+#: organisation/pipeline.py:324
 #, python-format
 msgid ""
-"You already have an account here that manages the organisation. Sign in with"
-" %(existing)s instead, then connect %(new)s from your profile."
+"More than one of these accounts has voted, is in an electoral register or in "
+"a group in the same meeting: %(meetings)s"
 msgstr ""
-"Du har allerede en konto her, som administrerer organisationen. Log i stedet"
-" ind med %(existing)s, og tilknyt derefter %(new)s fra din profil."
+"Mere end én af kontiene har stemt, står i en valgfortegnelse eller i en "
+"gruppe i samme møde: %(meetings)s"
 
-#: organisation/rest_api/views.py:83
+#: organisation/pipeline.py:495
+msgid ""
+"You already have an account here that manages the organisation, but it has no"
+" way to sign in. Ask another organisation manager for help."
+msgstr ""
+"Du har allerede en konto her, som administrerer organisationen, men den har "
+"ingen måde at logge ind på. Bed en anden organisationsadministrator om hjælp."
+
+#: organisation/pipeline.py:500
+#, python-format
+msgid ""
+"You already have an account here that manages the organisation. Sign in with "
+"%(existing)s instead, then connect %(new)s from your profile."
+msgstr ""
+"Du har allerede en konto her, som administrerer organisationen. Log i stedet "
+"ind med %(existing)s, og tilknyt derefter %(new)s fra din profil."
+
+#: organisation/rest_api/serializers.py:293
+msgid "Must be in the future."
+msgstr "Skal være i fremtiden."
+
+#: organisation/rest_api/views.py:101
 msgid "You're logged in to another organisation"
 msgstr "Du er logget ind i en anden organisation"
 
-#: organisation/rest_api/views.py:204
+#: organisation/rest_api/views.py:222
 msgid "Newer terms of service have taken effect"
 msgstr "Nye brugervilkår er trådt i kraft"
 
-#: organisation/rest_api/views.py:410
+#: organisation/rest_api/views.py:427 organisation/rest_api/views.py:488
 msgid "Required"
 msgstr "Påkrævet"
 
-#: organisation/rest_api/views.py:414
+#: organisation/rest_api/views.py:431 organisation/rest_api/views.py:492
 msgid "That question has already been answered."
 msgstr "Det spørgsmål er allerede besvaret."
 
-#: organisation/templates/voteit/organisation/login_method_added.html:5
-#, python-format
-msgid "Hi %(full_name)s!"
-msgstr "Hej %(full_name)s!"
+#: organisation/rest_api/views.py:581
+msgid "You can't remove yourself."
+msgstr "Du kan ikke fjerne dig selv."
+
+#: organisation/rest_api/views.py:584
+msgid "The user can still abort the request. Try again later."
+msgstr "Brugeren kan stadig afbryde anmodningen. Prøv igen senere."
 
 #: organisation/templates/voteit/organisation/login_method_added.html:8
 #, python-format
@@ -561,13 +646,13 @@ msgstr "Hvis det var dig, er alt i orden, og du behøver ikke gøre noget."
 #: organisation/templates/voteit/organisation/login_method_added.html:16
 #, python-format
 msgid ""
-"If it wasn't, someone else's login may have been connected to your account "
-"by mistake. Remove it under your profile at <a "
+"If it wasn't, someone else's login may have been connected to your account by"
+" mistake. Remove it under your profile at <a "
 "href=\"%(site_url)s\">%(site_url)s</a>, and contact the organisers if "
 "anything looks wrong."
 msgstr ""
-"Hvis det ikke var dig, kan en andens login ved en fejl være blevet "
-"tilknyttet din konto. Fjern det under din profil på <a "
+"Hvis det ikke var dig, kan en andens login ved en fejl være blevet tilknyttet"
+" din konto. Fjern det under din profil på <a "
 "href=\"%(site_url)s\">%(site_url)s</a>, og kontakt arrangørerne, hvis noget "
 "ser forkert ud."
 
@@ -575,15 +660,15 @@ msgstr ""
 msgid "Participant number"
 msgstr "Deltagernummer"
 
-#: poll/app/er_policies/auto_always.py:31
+#: poll/app/er_policies/auto_always.py:33
 msgid "Automatic always"
 msgstr "Altid automatisk"
 
-#: poll/app/er_policies/auto_always.py:33
+#: poll/app/er_policies/auto_always.py:35
 msgid ""
-"This method will always create a new electoral register when potential "
-"voters change. It will even change electoral register for ongoing polls, so "
-"use this with caution!"
+"This method will always create a new electoral register when potential voters"
+" change. It will even change electoral register for ongoing polls, so use "
+"this with caution!"
 msgstr ""
 "Denne metode opretter altid en ny liste over stemmeberettigede, når de "
 "potentielt stemmeberettigede ændres. Den udskifter endda listen over "
@@ -596,11 +681,11 @@ msgstr "Automatisk før afstemning"
 
 #: poll/app/er_policies/auto_before_poll.py:28
 msgid ""
-"Any users with potential voter status will be added to the electoral "
-"register when a poll starts."
+"Any users with potential voter status will be added to the electoral register"
+" when a poll starts."
 msgstr ""
-"Brugere, der er potentielt stemmeberettigede, bliver tilføjet til listen "
-"over stemmeberettigede, når en afstemning starter."
+"Brugere, der er potentielt stemmeberettigede, bliver tilføjet til listen over"
+" stemmeberettigede, når en afstemning starter."
 
 #: poll/app/er_policies/group_auto_rnd_before_poll.py:28
 msgid "Equal weighted group votes"
@@ -612,9 +697,9 @@ msgid ""
 "distributed evenly, the rest will be randomized. Only potential voters may "
 "receive a vote."
 msgstr ""
-"Gruppens medlemmer deler gruppens stemmer ligeligt. Hvis de ikke kan "
-"fordeles jævnt, fordeles resten tilfældigt. Kun potentielt stemmeberettigede"
-" kan få en stemme."
+"Gruppens medlemmer deler gruppens stemmer ligeligt. Hvis de ikke kan fordeles"
+" jævnt, fordeles resten tilfældigt. Kun potentielt stemmeberettigede kan få "
+"en stemme."
 
 #: poll/app/er_policies/group_votes_before_poll.py:36
 msgid "Weighted votes from group settings"
@@ -626,8 +711,8 @@ msgid ""
 "have the potential voter role. New electoral registers will be created "
 "whenever a poll starts if needed."
 msgstr ""
-"Grupperne har et samlet antal stemmer, som kan fordeles blandt medlemmer med"
-" rollen potentielt stemmeberettiget. Nye lister over stemmeberettigede "
+"Grupperne har et samlet antal stemmer, som kan fordeles blandt medlemmer med "
+"rollen potentielt stemmeberettiget. Nye lister over stemmeberettigede "
 "oprettes, når en afstemning starter, hvis det er nødvendigt."
 
 #: poll/app/er_policies/main_or_subst_er.py:41
@@ -636,17 +721,16 @@ msgstr "Ordinær/Suppleant + aktiv"
 
 #: poll/app/er_policies/main_or_subst_er.py:43
 msgid ""
-"Voters assigned depending on number of votes in groups. Votes are assigned "
-"to main first, then substitutes if there are any left. If there aren't "
-"enough votes for everyone, they're assigned in the order of when users "
-"became active. Electoral registries will be created and assigned when a poll"
-" starts."
+"Voters assigned depending on number of votes in groups. Votes are assigned to"
+" main first, then substitutes if there are any left. If there aren't enough "
+"votes for everyone, they're assigned in the order of when users became "
+"active. Electoral registries will be created and assigned when a poll starts."
 msgstr ""
 "Stemmer tildeles ud fra antallet af stemmer i hver gruppe. Ordinære får "
 "stemmer først, derefter suppleanter, hvis der er stemmer tilbage. Hvis der "
 "ikke er stemmer nok til alle, tildeles de i den rækkefølge, brugerne blev "
-"aktive. Lister over stemmeberettigede oprettes og tildeles, når en "
-"afstemning starter."
+"aktive. Lister over stemmeberettigede oprettes og tildeles, når en afstemning"
+" starter."
 
 #: poll/app/er_policies/main_subst_delegate.py:93
 msgid "Main/Substitute + delegate votes"
@@ -658,9 +742,9 @@ msgid ""
 "substitute role. Electoral registries will be created and assigned when a "
 "poll starts."
 msgstr ""
-"Gruppemedlemmer, der er ordinære, har stemmer og kan delegere dem til "
-"brugere med rollen suppleant. Lister over stemmeberettigede oprettes og "
-"tildeles, når en afstemning starter."
+"Gruppemedlemmer, der er ordinære, har stemmer og kan delegere dem til brugere"
+" med rollen suppleant. Lister over stemmeberettigede oprettes og tildeles, "
+"når en afstemning starter."
 
 #: poll/app/er_policies/manual.py:20
 msgid "Fully manual"
@@ -672,9 +756,9 @@ msgid ""
 "You need to hand-pick voters from any participants with the role potential "
 "voter."
 msgstr ""
-"Der oprettes slet ingen lister over stemmeberettigede, det skal du selv "
-"gøre! Du skal håndplukke stemmeberettigede blandt deltagere med rollen "
-"potentielt stemmeberettiget."
+"Der oprettes slet ingen lister over stemmeberettigede, det skal du selv gøre!"
+" Du skal håndplukke stemmeberettigede blandt deltagere med rollen potentielt "
+"stemmeberettiget."
 
 #: poll/app/er_policies/manual_trigger.py:21
 msgid "Manual trigger"
@@ -682,26 +766,26 @@ msgstr "Manuelt oprettet"
 
 #: poll/app/er_policies/manual_trigger.py:23
 msgid ""
-"Create electoral registers from potential voters. Simply click the button on"
-" electoral registers page."
+"Create electoral registers from potential voters. Simply click the button on "
+"electoral registers page."
 msgstr ""
 "Opret lister over stemmeberettigede ud fra de potentielt stemmeberettigede. "
 "Klik blot på knappen på siden med lister over stemmeberettigede."
 
-#: poll/app/er_policies/presence_check.py:26
+#: poll/app/er_policies/presence_check.py:25
 msgid "Presence check"
 msgstr "Tilstedeværelseskontrol"
 
-#: poll/app/er_policies/presence_check.py:28
+#: poll/app/er_policies/presence_check.py:27
 msgid ""
-"Any user who's both present and has the potential voter role will be added "
-"to the electoral register when it closes. If group votes is activated, the "
+"Any user who's both present and has the potential voter role will be added to"
+" the electoral register when it closes. If group votes is activated, the "
 "votes will be distributed equally between present members."
 msgstr ""
 "Brugere, der både er til stede og har rollen potentielt stemmeberettiget, "
 "bliver tilføjet til listen over stemmeberettigede, når "
-"tilstedeværelseskontrollen lukkes. Hvis gruppestemmer er aktiveret, fordeles"
-" stemmerne ligeligt mellem de tilstedeværende medlemmer."
+"tilstedeværelseskontrollen lukkes. Hvis gruppestemmer er aktiveret, fordeles "
+"stemmerne ligeligt mellem de tilstedeværende medlemmer."
 
 #: poll/app/polls/combined_simple.py:20 poll/app/polls/simple.py:18
 msgid "Yes"
@@ -728,29 +812,29 @@ msgid "Too many proposals picked"
 msgstr "For mange forslag valgt"
 
 #: poll/app/polls/dutt.py:143 poll/app/polls/schulze.py:148
-#: poll/app/polls/scottish_stv.py:144
+#: poll/app/polls/scottish_stv.py:155
 #, python-format
 msgid "Invalid choice, the following proposals don't exist: %s"
 msgstr "Ugyldigt valg, følgende forslag findes ikke: %s"
 
-#: poll/app/polls/irv.py:31
+#: poll/app/polls/irv.py:38
 msgid "Instant-Runoff Voting"
 msgstr "Instant-Runoff Voting"
 
-#: poll/app/polls/irv.py:48 poll/app/polls/irv.py:175
+#: poll/app/polls/irv.py:55 poll/app/polls/irv.py:186
 #, python-format
 msgid "The method %(method)s requires at least 3 proposals"
 msgstr "Metoden %(method)s kræver mindst 3 forslag"
 
-#: poll/app/polls/irv.py:157
+#: poll/app/polls/irv.py:167
 msgid "Repeated Instant-Runoff Voting"
 msgstr "Gentaget Instant-Runoff Voting"
 
-#: poll/app/polls/irv.py:185
+#: poll/app/polls/irv.py:196
 msgid "Too few selected"
 msgstr "For få valgt"
 
-#: poll/app/polls/irv.py:187
+#: poll/app/polls/irv.py:198
 msgid "Too many selected"
 msgstr "For mange valgt"
 
@@ -778,12 +862,12 @@ msgstr "Gentaget Schulze"
 msgid "Scottish STV"
 msgstr "Skotsk STV"
 
-#: poll/app/polls/scottish_stv.py:154
+#: poll/app/polls/scottish_stv.py:165
 #, python-format
 msgid "The method %(method)s can't have as many winners as proposals"
 msgstr "Metoden %(method)s kan ikke have lige så mange vindere som forslag"
 
-#: poll/app/polls/scottish_stv.py:159
+#: poll/app/polls/scottish_stv.py:170
 #, python-format
 msgid "The method %(method)s requires at least %(min_winners)d winners"
 msgstr "Metoden %(method)s kræver mindst %(min_winners)d vindere"
@@ -830,15 +914,15 @@ msgstr "Ugyldige afstemningsindstillinger."
 msgid "Invalid proposal count."
 msgstr "Forkert antal forslag."
 
-#: poll/rest_api/serializers.py:224 poll/rest_api/serializers.py:254
+#: poll/rest_api/serializers.py:225 poll/rest_api/serializers.py:255
 msgid "Meeting isn't ongoing"
 msgstr "Mødet er ikke i gang"
 
-#: poll/rest_api/serializers.py:332
+#: poll/rest_api/serializers.py:336
 msgid "Can't provide a vote when abstaining."
 msgstr "Du kan ikke afgive en stemme, når du undlader at stemme."
 
-#: poll/rest_api/serializers.py:340
+#: poll/rest_api/serializers.py:344
 msgid "Must be an object matching this poll's vote format."
 msgstr "Skal være et objekt, der matcher afstemningens stemmeformat."
 
@@ -902,7 +986,7 @@ msgstr "Allerede på listen."
 msgid "User isn't a participant in this meeting."
 msgstr "Brugeren deltager ikke i mødet."
 
-#: speaker/rest_api/views.py:99
+#: speaker/rest_api/views.py:100
 msgid "Shuffle isn't allowed with an active speaker."
 msgstr "Bland er ikke tilladt, mens der er en aktiv taler."
 
@@ -925,20 +1009,3 @@ msgstr "Inaktivér"
 #: speaker/statemachines.py:42
 msgid "Stop current speaker first"
 msgstr "Stop den nuværende taler først"
-
-#: organisation/pipeline.py
-msgid ""
-"One of these accounts manages the organisation, so they can't be merged "
-"here. Contact VoteIT to have them merged."
-msgstr ""
-"En af kontiene administrerer organisationen, så de kan ikke lægges sammen "
-"her. Kontakt VoteIT for at få dem lagt sammen."
-
-#: organisation/pipeline.py
-#, python-format
-msgid ""
-"More than one of these accounts has voted, is in an electoral register or in "
-"a group in the same meeting: %(meetings)s"
-msgstr ""
-"Mere end én af kontiene har stemt, står i en valgfortegnelse eller i en "
-"gruppe i samme møde: %(meetings)s"

@@ -358,9 +358,17 @@ writes its own auditlog entries:
   drop the actor the middleware set for the rest of the request.
 - Nothing is written for a dry run or under `disable_auditlog()`.
 
+`run()` locks both rows (`select_for_update`, pk order) and validates inside the transaction,
+against the rows as they are then. The target must be active and have no `removal_requested`:
+two logins merging the same accounts at once would otherwise deactivate each other's target,
+and removing the target would take the merged votes and login methods along. An inactive
+source is allowed, it may be a leftover the admin is cleaning up.
+
 Group memberships are moved first, with `update()` so role and votes stay: deleting the
 source's `MeetingRoles` afterwards cascades into its memberships
-(`meeting.signals.remove_group_memberships`). One in a group the target is already in is skipped.
+(`meeting.signals.remove_group_memberships`). When both are in the same group, the source's
+`votes` are added to the target's membership, so the members still add up to
+`MeetingGroup.votes`, and the target takes the source's `role` if it has none of its own.
 
 `crucial_meetings(user)` / `merge_conflicts(users)` — meetings where an account voted, is in an
 electoral register or a meeting group. Two accounts with crucial data in the same meeting

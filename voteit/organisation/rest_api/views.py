@@ -492,9 +492,8 @@ class IdentityAccountOptionsViewSet(viewsets.ViewSet):
             raise NotFound(_("That question has already been answered."))
         backend = load_backend(strategy, stored.backend, redirect_uri=None)
         # Recomputed, never read back from the partial.
-        accounts = find_identity_accounts(
-            backend.organisation, stored.kwargs.get("uid")
-        )
+        uid = stored.kwargs.get("uid")
+        accounts = find_identity_accounts(backend.organisation, uid)
         meetings = {}
         for row in (
             MeetingRoles.objects.filter(
@@ -514,7 +513,7 @@ class IdentityAccountOptionsViewSet(viewsets.ViewSet):
                     "state": row["context__state"],
                 }
             )
-        reason = why_not_mergeable(accounts) if len(accounts) > 1 else None
+        reason = why_not_mergeable(accounts, uid) if len(accounts) > 1 else None
         return Response(
             data={
                 "provider": stored.backend,

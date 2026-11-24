@@ -70,6 +70,39 @@ class ValidationTests(TestCase):
         self.source.refresh_from_db()
         self.assertTrue(self.source.is_active)
 
+    def test_inactive_target_raises(self):
+        self.target.is_active = False
+        self.target.save()
+        with self.assertRaises(ValueError):
+            UserMerger(self.source, self.target).run()
+
+    def test_target_deactivated_meanwhile_raises(self):
+        """
+        Another merge deactivated the target after this one was set up: the
+        state under the row lock decides, not the instance passed in.
+        """
+        from django.contrib.auth import get_user_model
+
+        get_user_model().objects.filter(pk=self.target.pk).update(is_active=False)
+        self.assertTrue(self.target.is_active)
+        with self.assertRaises(ValueError):
+            UserMerger(self.source, self.target).run()
+        self.source.refresh_from_db()
+        self.assertTrue(self.source.is_active)
+
+    def test_target_with_removal_requested_raises(self):
+        from django.utils.timezone import now
+
+        self.target.removal_requested = now()
+        self.target.save()
+        with self.assertRaises(ValueError):
+            UserMerger(self.source, self.target).run()
+
+    def test_inactive_source_is_allowed(self):
+        self.source.is_active = False
+        self.source.save()
+        UserMerger(self.source, self.target).run()
+
 
 class RolesTests(TestCase):
     """Meeting and organisation role merging."""
@@ -366,11 +399,54 @@ class GroupMembershipTests(TestCase):
         GroupMembership.objects.create(
             meeting_group=self.shared, user=self.target, role=self.role, votes=3
         )
-        log = UserMerger(self.source, self.target).run()
+        UserMerger(self.source, self.target).run()
         kept = self._memberships(self.target).get()
         self.assertEqual(self.role, kept.role)
-        self.assertEqual(3, kept.votes)
-        self.assertTrue(any("GroupMembership" in msg for msg in log.skipped))
+        # The group's members still add up to the same vote weight.
+        self.assertEqual(4, kept.votes)
+
+    def test_shared_group_takes_the_sources_role(self):
+        from voteit.meeting.models import GroupMembership
+
+        GroupMembership.objects.create(
+            meeting_group=self.shared, user=self.source, role=self.role, votes=2
+        )
+        GroupMembership.objects.create(meeting_group=self.shared, user=self.target)
+        UserMerger(self.source, self.target).run()
+        kept = self._memberships(self.target).get()
+        self.assertEqual(self.role, kept.role)
+        self.assertEqual(2, kept.votes)
+        self.assertTrue(self.meeting.has_roles(self.target, "pv"))
+
+    def test_shared_group_conflicting_roles_target_keeps_its_own(self):
+        from voteit.meeting.models import GroupMembership
+        from voteit.meeting.models import GroupRole
+
+        other_role = GroupRole.objects.create(
+            meeting=self.meeting, title="Other", roles=[]
+        )
+        GroupMembership.objects.create(
+            meeting_group=self.shared, user=self.source, role=other_role
+        )
+        GroupMembership.objects.create(
+            meeting_group=self.shared, user=self.target, role=self.role
+        )
+        log = UserMerger(self.source, self.target).run()
+        self.assertEqual(self.role, self._memberships(self.target).get().role)
+        self.assertTrue(any("dropped" in msg for msg in log.skipped))
+
+    def test_shared_group_dry_run_changes_nothing(self):
+        from voteit.meeting.models import GroupMembership
+
+        GroupMembership.objects.create(
+            meeting_group=self.shared, user=self.source, votes=1
+        )
+        GroupMembership.objects.create(
+            meeting_group=self.shared, user=self.target, votes=3
+        )
+        UserMerger(self.source, self.target, dry_run=True).run()
+        self.assertEqual(3, self._memberships(self.target).get().votes)
+        self.assertEqual(1, self._memberships(self.source).get().votes)
 
     def test_membership_survives_source_meeting_roles(self):
         """

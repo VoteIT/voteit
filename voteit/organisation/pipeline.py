@@ -287,10 +287,28 @@ CHOOSE_ACCOUNT_FIELD = "choose_account"
 MERGE_ACCOUNTS_FIELD = "merge_accounts"
 
 
-def why_not_mergeable(accounts: list) -> str | None:
+def _holds_identity(account, uid: str) -> bool:
+    """
+    Only these are known to be the person logging in. An account that only
+    holds the credential may have got it by mistake, and merging it would
+    hand its other login methods to this person.
+    """
+    return bool(uid) and account.identity_id == uid
+
+
+def why_not_mergeable(accounts: list, uid: str) -> str | None:
     """
     Why these accounts can't be merged by their owner, or None if they can.
     """
+    if not all(_holds_identity(account, uid) for account in accounts):
+        return _(
+            "One of these accounts isn't tied to your identity, so they can't be "
+            "merged here. Contact VoteIT to have them merged."
+        )
+    if any(account.removal_requested is not None for account in accounts):
+        return _(
+            "One of these accounts is about to be removed, so they can't be merged."
+        )
     if any(is_elevated(account) for account in accounts):
         return _(
             "One of these accounts manages the organisation, so they can't be "
@@ -311,8 +329,8 @@ def why_not_mergeable(accounts: list) -> str | None:
 
 def _merge_into(backend, sources: list, target) -> None:
     for source in sources:
-        # The id proxy just proved this person holds the identity, and every
-        # account here holds that identity or its credential.
+        # The id proxy just proved this person holds the identity. Callers pass
+        # only accounts holding it, or holding nothing but its credential.
         UserMerger(source, target, same_person=True, actor=target).run()
         log_auth(
             "Duplicate account merged at login",
@@ -323,12 +341,53 @@ def _merge_into(backend, sources: list, target) -> None:
         )
 
 
+def _only_this_credential(account, uid: str) -> bool:
+    """
+    No login method on it but this id proxy credential, so a merge hands
+    nothing of anyone else's to the person logging in.
+    """
+    return not account.social_auth.exclude(provider=IDPROXY_PROVIDER, uid=uid).exists()
+
+
+def _merge_unused(backend, uid: str, session_user, accounts: list) -> None:
+    """
+    Merge accounts nobody has used into the one the person would pick anyway.
+    The target always holds the identity.
+    """
+    accounts = [a for a in accounts if a.removal_requested is None]
+    holders = [a for a in accounts if _holds_identity(a, uid)]
+    if not holders:
+        return
+    target = pick_merge_target(holders, session_user)
+    unused = [
+        account
+        for account in accounts
+        if account != target
+        and user_activity_score(account) == 0
+        and (_holds_identity(account, uid) or _only_this_credential(account, uid))
+    ]
+    if not unused:
+        return
+    try:
+        _merge_into(backend, unused, target)
+    except ValueError as exc:
+        # Another login merged these first, the caller recomputes the accounts.
+        logger.warning(
+            "Silent merge at login skipped. Organisation: %s, target: %s, reason: %s",
+            backend.organisation.pk,
+            target.pk,
+            exc,
+        )
+
+
 def _settle(backend, social, session_user, chosen) -> dict:
     """
     Continue the login as ``chosen``, with the credential on it.
     """
     if social is not None and social.user_id != chosen.pk:
         previous = social.user
+        # A merge earlier in this step may have deactivated it.
+        previous.refresh_from_db(fields=["is_active"])
         social.user = chosen
         social.save()
         if not previous.is_active:
@@ -368,28 +427,23 @@ def resolve_identity_accounts(
     One id proxy identity, several active accounts in this organisation.
 
     Accounts nobody has used are merged away silently, unless one of the
-    accounts is elevated. If more than one is left, the login **pauses** and the person picks one, or asks to merge them.
-    A merge is refused when the accounts are elevated or have crucial data in
-    the same meeting (see ``merge_conflicts``): that is logged as an error and
-    the person is asked to pick one instead.
+    accounts is elevated. Only accounts holding the identity, without a pending
+    removal, take part. If more than one is left, the login **pauses** and the
+    person picks one, or asks to merge them. A merge is refused for the reasons
+    in ``why_not_mergeable``: that is logged as an error and the person is
+    asked to pick one instead.
     """
     if not identity_accounts:
         return
     # Recomputed, the accounts may have changed while the question was open.
     accounts = find_identity_accounts(backend.organisation, uid)
-    if not accounts:
-        return {"user": social.user if social else None, "identity_accounts": None}
-    target = pick_merge_target(accounts, user)
     # A merge moves every login method onto the target, so nothing is merged
     # into a manager's account without anyone being asked.
-    unused = [
-        account
-        for account in accounts
-        if account != target and user_activity_score(account) == 0
-    ]
-    if unused and not any(is_elevated(account) for account in accounts):
-        _merge_into(backend, unused, target)
-        accounts = [account for account in accounts if account not in unused]
+    if not any(is_elevated(account) for account in accounts):
+        _merge_unused(backend, uid, user, accounts)
+        accounts = find_identity_accounts(backend.organisation, uid)
+    if not accounts:
+        return {"user": social.user if social else None, "identity_accounts": None}
     if len(accounts) == 1:
         return _settle(backend, social, user, accounts[0])
     answer = strategy.request_data()
@@ -399,8 +453,9 @@ def resolve_identity_accounts(
         if chosen is not None:
             return _settle(backend, social, user, chosen)
     elif answer.get(MERGE_ACCOUNTS_FIELD):
-        reason = why_not_mergeable(accounts)
+        reason = why_not_mergeable(accounts, uid)
         if reason is None:
+            target = pick_merge_target(accounts, user)
             try:
                 _merge_into(backend, [a for a in accounts if a != target], target)
             except Exception as exc:

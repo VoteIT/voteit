@@ -1,6 +1,15 @@
 # Changelog
 
-## 1.7.0 (2027-11-17)
+## 1.8.0 (unreleased)
+
+- **Duplicate accounts at login**: An id proxy login that reaches several accounts now pauses and lets the person pick
+  one or merge them (`/api/identity-account-options/`, new setting `CHOOSE_ACCOUNT_URL`). Unused duplicates are merged
+  silently. Merges are refused for org managers, pending removals, accounts not tied to the identity, and accounts
+  with votes, electoral registers or groups in the same meeting.
+- **User merge**: Merges are auditlogged, lock both accounts, and combine group memberships instead of dropping
+  the source's votes.
+
+## 1.7.0 (2026-11-17)
 
 - **Removal requests**: Users can ask to have their account removed, with an emailed abort link and a lockout while
   the request is pending. Users without activity are deleted, org managers review the rest and delete or anonymise

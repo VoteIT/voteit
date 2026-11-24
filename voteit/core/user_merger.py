@@ -194,11 +194,12 @@ class UserMerger:
         self.log = MergeLog()
 
     def run(self) -> MergeLog:
-        self._validate()
         cid_token = correlation_id.set(self.cid)
         actor_token = _merge_actor.set(self.actor)
         try:
             with transaction.atomic(durable=True):
+                self._lock()
+                self._validate()
                 # Before meeting roles: deleting the source's MeetingRoles cascades
                 # into its group memberships (meeting.signals.remove_group_memberships).
                 self._handle_group_memberships()
@@ -248,9 +249,33 @@ class UserMerger:
                 additional_data={**user.get_additional_data(), "merge": summary},
             )
 
+    def _lock(self) -> None:
+        """
+        Two merges of the same accounts at once (two logins finishing together)
+        could otherwise each deactivate the other's target. The second one waits
+        here and then reads the first one's result.
+        """
+        from voteit.core.models import User
+
+        list(
+            User.objects.select_for_update()
+            .filter(pk__in=[self.source.pk, self.target.pk])
+            .order_by("pk")
+        )
+        self.source.refresh_from_db()
+        self.target.refresh_from_db()
+
     def _validate(self) -> None:
         if self.source.pk == self.target.pk:
             raise ValueError("Source and target are the same user")
+        # An inactive source is fine, it may be a leftover the admin cleans up.
+        if not self.target.is_active:
+            raise ValueError(f"Target user pk={self.target.pk} is inactive")
+        if self.target.removal_requested is not None:
+            # Removing it would take the merged votes and login methods along.
+            raise ValueError(
+                f"Target user pk={self.target.pk} has requested to be removed"
+            )
         if self.source.organisation_id != self.target.organisation_id:
             raise ValueError(
                 f"Users belong to different organisations: "
@@ -298,17 +323,13 @@ class UserMerger:
         """
         from voteit.meeting.models import GroupMembership
 
-        target_groups = set(
-            GroupMembership.objects.filter(user=self.target).values_list(
-                "meeting_group_id", flat=True
-            )
-        )
+        target_memberships = {
+            m.meeting_group_id: m
+            for m in GroupMembership.objects.filter(user=self.target)
+        }
         for src in GroupMembership.objects.filter(user=self.source):
-            if src.meeting_group_id in target_groups:
-                self.log.skipped.append(
-                    f"GroupMembership pk={src.pk} (meeting_group_id={src.meeting_group_id}) "
-                    f"skipped: target already a member, removed with the source's meeting roles"
-                )
+            if tgt := target_memberships.get(src.meeting_group_id):
+                self._combine_memberships(src, tgt)
                 continue
             if not self.dry_run:
                 GroupMembership.objects.filter(pk=src.pk).update(user=self.target)
@@ -316,6 +337,50 @@ class UserMerger:
             self.log.moved.append(
                 f"GroupMembership pk={src.pk} (meeting_group_id={src.meeting_group_id}) moved"
             )
+
+    def _combine_memberships(self, src, tgt) -> None:
+        """
+        Both in one group. The source's membership is deleted with its meeting
+        roles, so its votes go to the target's or the group's members would
+        no longer add up to MeetingGroup.votes. The target keeps its own role.
+        """
+        changes = {}
+        if src.votes:
+            changes["votes"] = (tgt.votes or 0) + src.votes
+        if tgt.role_id is None and src.role_id is not None:
+            changes["role_id"] = src.role_id
+        elif src.role_id not in (None, tgt.role_id):
+            self.log.skipped.append(
+                f"GroupMembership pk={src.pk} (meeting_group_id={src.meeting_group_id}): "
+                f"role_id={src.role_id} dropped, target keeps role_id={tgt.role_id}"
+            )
+        if changes:
+            if not self.dry_run:
+                type(tgt).objects.filter(pk=tgt.pk).update(**changes)
+                for name, value in changes.items():
+                    self._log_membership_change(tgt, name, getattr(tgt, name), value)
+            self.log.merged_roles.append(
+                f"GroupMembership pk={src.pk} (meeting_group_id={src.meeting_group_id}): "
+                f"merged into pk={tgt.pk} ({', '.join(sorted(changes))})"
+            )
+        else:
+            self.log.skipped.append(
+                f"GroupMembership pk={src.pk} (meeting_group_id={src.meeting_group_id}) "
+                f"skipped: target already a member, removed with the source's meeting roles"
+            )
+
+    @staticmethod
+    def _log_membership_change(obj, name, old, new) -> None:
+        if auditlog_disabled.get() or not auditlog.contains(obj.__class__):
+            return
+        from auditlog.models import LogEntry
+
+        LogEntry.objects.log_create(
+            obj,
+            force_log=True,
+            action=LogEntry.Action.UPDATE,
+            changes={name.removesuffix("_id"): [str(old), str(new)]},
+        )
 
     def _handle_organisation_roles(self) -> None:
         from voteit.organisation.models import OrganisationRoles
