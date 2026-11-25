@@ -1,10 +1,14 @@
 import csv
 
 from django.db import models
+from django.db import transaction
 from django.http import Http404
 from django.http import HttpResponse
+from django.utils.translation import gettext as _
+from rest_framework import status
 from rest_framework import viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
@@ -14,6 +18,7 @@ from voteit.core.rest_api.mixins import StateMachineMixin
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.proposal import MAX_BULK_PROPOSALS
 from voteit.proposal.models import Proposal
 from voteit.proposal.models import TextDocument
 from voteit.proposal.rest_api import serializers
@@ -35,12 +40,13 @@ class ProposalViewSet(
         **VerboseAutoPermissionViewSetMixin.permission_type_map,
         "create": None,
         "preview": None,
+        "bulk_create": None,
         "event": None,
         "state_machine": None,
     }
 
     def get_serializer_class(self):
-        if self.action in ("preview", "create"):
+        if self.action == "create":
             return serializers.GenericCreateProposalSerializer
         elif self.action == "list":
             return serializers.ProposalDetailSerializer
@@ -65,12 +71,72 @@ class ProposalViewSet(
             .distinct()
         )
 
-    @action(methods=["post"], detail=False)
+    def _validate_many(self, request) -> list:
+        """
+        Validate a list of proposals, each with its own (morphic) serializer.
+        Errors are raised as a list aligned with the input, like DRFs ListSerializer.
+        """
+        items = request.data
+        if not isinstance(items, list) or not items:
+            raise ValidationError(
+                {"non_field_errors": [_("Expected a non-empty list of proposals")]}
+            )
+        if len(items) > MAX_BULK_PROPOSALS:
+            raise ValidationError(
+                {
+                    "non_field_errors": [
+                        _("You can add at most %(max)s proposals at a time")
+                        % {"max": MAX_BULK_PROPOSALS}
+                    ]
+                }
+            )
+        serializers_ = []
+        errors = []
+        for item in items:
+            if not isinstance(item, dict):
+                errors.append({"non_field_errors": [_("Expected an object")]})
+                continue
+            try:
+                serializer = self.get_serializer(data=item)
+            except ValidationError as exc:
+                # Bad shortname
+                errors.append(exc.detail)
+                continue
+            serializer.is_valid()
+            errors.append(serializer.errors)
+            serializers_.append(serializer)
+        if any(errors):
+            raise ValidationError(errors)
+        return serializers_
+
+    @action(
+        methods=["post"],
+        detail=False,
+        serializer_class=serializers.GenericCreateProposalSerializer,
+    )
     def preview(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.to_representation(serializer.validated_data)
+        data = [
+            serializer.to_representation(serializer.validated_data)
+            for serializer in self._validate_many(request)
+        ]
         return Response(data=data)
+
+    @action(
+        methods=["post"],
+        detail=False,
+        url_path="bulk-create",
+        serializer_class=serializers.GenericCreateProposalSerializer,
+    )
+    def bulk_create(self, request, *args, **kwargs):
+        # Validate everything before saving anything
+        serializers_ = self._validate_many(request)
+        with transaction.atomic():
+            for serializer in serializers_:
+                serializer.save()
+        return Response(
+            data=[serializer.data for serializer in serializers_],
+            status=status.HTTP_201_CREATED,
+        )
 
 
 @router.register("text-documents", basename="text-document")
