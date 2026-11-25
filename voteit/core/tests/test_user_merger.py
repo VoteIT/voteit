@@ -611,6 +611,29 @@ class AuditTrailTests(TestCase):
             with self.subTest(obj.__class__.__name__):
                 self.assertEqual(expected, self._for(entries, obj).get().changes_dict)
 
+    def test_log_entries_stay_with_their_actor(self):
+        from auditlog.models import LogEntry
+        from django.contrib.admin.models import CHANGE
+        from django.contrib.admin.models import LogEntry as AdminLogEntry
+        from django.contrib.contenttypes.models import ContentType
+
+        audit_entry = LogEntry.objects.log_create(
+            self.meeting, force_log=True, action=LogEntry.Action.UPDATE, changes={}
+        )
+        LogEntry.objects.filter(pk=audit_entry.pk).update(actor=self.source)
+        admin_entry = AdminLogEntry.objects.create(
+            user=self.source,
+            content_type=ContentType.objects.get_for_model(self.meeting),
+            object_id=str(self.meeting.pk),
+            object_repr="Meeting",
+            action_flag=CHANGE,
+        )
+        UserMerger(self.source, self.target).run()
+        audit_entry.refresh_from_db()
+        admin_entry.refresh_from_db()
+        self.assertEqual(self.source.pk, audit_entry.actor_id)
+        self.assertEqual(self.source.pk, admin_entry.user_id)
+
     def test_every_entry_has_the_actor(self):
         merger = UserMerger(self.source, self.target, actor=self.admin)
         merger.run()

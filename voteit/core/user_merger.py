@@ -25,6 +25,9 @@ _EXPLICITLY_HANDLED = frozenset(
         ("meeting", "meetingroles", "user"),
         ("organisation", "organisationroles", "user"),
         ("active", "activeuser", "user"),
+        # The admin's change history. What the source did stays on the source.
+        # (auditlog's LogEntry.actor has no reverse relation, so it's never walked.)
+        ("admin", "logentry", "user"),
     }
 )
 
