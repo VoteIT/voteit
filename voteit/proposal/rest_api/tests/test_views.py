@@ -200,9 +200,9 @@ class ProposalsAPITests(APITestCase):
             "body": "Hello!",
         }
         self.client.force_login(self.moderator)
-        response = self.client.post(url, data)
+        response = self.client.post(url, [data], format="json")
         self.assertEqual(200, response.status_code)
-        data = response.json()
+        data = response.json()[0]
         self.assertEqual("Hello!", data["body"])
 
     def test_preview_proposal_mentions(self):
@@ -213,9 +213,9 @@ class ProposalsAPITests(APITestCase):
             "mentions": [self.moderator.pk],
         }
         self.client.force_login(self.moderator)
-        response = self.client.post(url, data)
+        response = self.client.post(url, [data], format="json")
         self.assertEqual(200, response.status_code)
-        data = response.json()
+        data = response.json()[0]
         self.assertEqual(
             {self.participant.pk, self.moderator.pk}, set(data["mentions"])
         )
@@ -229,9 +229,9 @@ class ProposalsAPITests(APITestCase):
             "paragraph": self.para.pk,
         }
         self.client.force_login(self.moderator)
-        response = self.client.post(url, data)
+        response = self.client.post(url, [data], format="json")
         self.assertEqual(200, response.status_code)
-        data = response.json()
+        data = response.json()[0]
         self.assertEqual("moderator-{n}", data["prop_id"])
         self.assertEqual(
             "Hello world!",
@@ -241,6 +241,41 @@ class ProposalsAPITests(APITestCase):
             '<span class="text-diff-removed">I am the eggman <br/> I am the walrus</span> <span class="text-diff-added">Hello world!</span>',
             data["body_diff_brief"],
         )
+
+    def test_preview_many(self):
+        url = reverse("proposal-preview")
+        data = [
+            {"agenda_item": self.ai.pk, "body": "One"},
+            {"agenda_item": self.ai.pk, "body": "Two"},
+        ]
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, data, format="json")
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(["One", "Two"], [x["body"] for x in response.json()])
+
+    def test_preview_bad_input(self):
+        url = reverse("proposal-preview")
+        self.client.force_login(self.moderator)
+        item = {"agenda_item": self.ai.pk, "body": "Hello"}
+        for data in ([], item, [item] * 21, ["hello"]):
+            response = self.client.post(url, data, format="json")
+            self.assertEqual(400, response.status_code, data)
+
+    def test_preview_errors_per_item(self):
+        url = reverse("proposal-preview")
+        data = [
+            {"agenda_item": self.ai.pk, "body": "Good"},
+            {"agenda_item": -1, "body": "Bad"},
+            {"agenda_item": self.ai.pk, "body": "Bad", "shortname": "nope"},
+        ]
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, data, format="json")
+        self.assertEqual(400, response.status_code)
+        errors = response.json()
+        self.assertEqual(3, len(errors))
+        self.assertEqual({}, errors[0])
+        self.assertIn("agenda_item", errors[1])
+        self.assertIn("shortname", errors[2])
 
     @patch.object(ParticipantsChannel, "sync_publish")
     def test_transition_on_diff_triggers_correct_push(self, mock_publish):
