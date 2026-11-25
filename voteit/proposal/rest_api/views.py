@@ -1,9 +1,11 @@
 import csv
 
 from django.db import models
+from django.db import transaction
 from django.http import Http404
 from django.http import HttpResponse
 from django.utils.translation import gettext as _
+from rest_framework import status
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -38,6 +40,7 @@ class ProposalViewSet(
         **VerboseAutoPermissionViewSetMixin.permission_type_map,
         "create": None,
         "preview": None,
+        "bulk_create": None,
         "event": None,
         "state_machine": None,
     }
@@ -117,6 +120,23 @@ class ProposalViewSet(
             for serializer in self._validate_many(request)
         ]
         return Response(data=data)
+
+    @action(
+        methods=["post"],
+        detail=False,
+        url_path="bulk-create",
+        serializer_class=serializers.GenericCreateProposalSerializer,
+    )
+    def bulk_create(self, request, *args, **kwargs):
+        # Validate everything before saving anything
+        serializers_ = self._validate_many(request)
+        with transaction.atomic():
+            for serializer in serializers_:
+                serializer.save()
+        return Response(
+            data=[serializer.data for serializer in serializers_],
+            status=status.HTTP_201_CREATED,
+        )
 
 
 @router.register("text-documents", basename="text-document")

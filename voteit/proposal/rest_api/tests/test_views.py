@@ -6,6 +6,7 @@ from django.urls import reverse
 from rest_framework.test import APITestCase
 
 from voteit.agenda.models import AgendaItem
+from voteit.core.testing import FakeCommit
 from voteit.core.testing import mk_hashtag
 from voteit.core.testing import mk_usertag
 from voteit.meeting.channels import ParticipantsChannel
@@ -13,6 +14,9 @@ from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PROPOSER
+from voteit.messaging.testing import MessageCatcher
+from voteit.messaging.testing import action_of
+from voteit.proposal.messages import ProposalChanged
 from voteit.proposal.models import DiffProposal
 from voteit.proposal.models import TextDocument
 from voteit.proposal.models import TextParagraph
@@ -276,6 +280,97 @@ class ProposalsAPITests(APITestCase):
         self.assertEqual({}, errors[0])
         self.assertIn("agenda_item", errors[1])
         self.assertIn("shortname", errors[2])
+
+    def test_bulk_create(self):
+        url = reverse("proposal-bulk-create")
+        data = [{"agenda_item": self.ai.pk, "body": body} for body in ("A", "B", "C")]
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, data, format="json")
+        self.assertEqual(201, response.status_code, response.json())
+        result = response.json()
+        self.assertEqual(["A", "B", "C"], [x["body"] for x in result])
+        self.assertEqual(
+            ["moderator-1", "moderator-2", "moderator-3"],
+            [x["prop_id"] for x in result],
+        )
+        self.assertEqual(
+            ["A", "B", "C"],
+            list(
+                self.ai.proposals.filter(author=self.moderator)
+                .order_by("created")
+                .values_list("body", flat=True)
+            ),
+        )
+
+    def test_bulk_create_publishes_one_batch(self):
+        url = reverse("proposal-bulk-create")
+        data = [{"agenda_item": self.ai.pk, "body": body} for body in ("A", "B", "C")]
+        self.client.force_login(self.moderator)
+        with MessageCatcher() as messages:
+            # Test data has staged a batcher already; FakeCommit starts clean
+            with FakeCommit():
+                response = self.client.post(url, data, format="json")
+        self.assertEqual(201, response.status_code)
+        action = action_of(ProposalChanged)
+        batches = [m for m in messages if m.action == f"{action}.batch"]
+        # One batch each for moderators and participants, no single messages
+        self.assertEqual(2, len(batches))
+        self.assertFalse([m for m in messages if m.action == action])
+        for batch in batches:
+            self.assertEqual(
+                ["A", "B", "C"], [item.body for item in batch.payload.items]
+            )
+
+    def test_bulk_create_too_many(self):
+        url = reverse("proposal-bulk-create")
+        data = [{"agenda_item": self.ai.pk, "body": "Hello"}] * 21
+        self.client.force_login(self.moderator)
+        count = self.ai.proposals.count()
+        response = self.client.post(url, data, format="json")
+        self.assertEqual(400, response.status_code)
+        self.assertEqual(count, self.ai.proposals.count())
+
+    def test_bulk_create_invalid_creates_nothing(self):
+        url = reverse("proposal-bulk-create")
+        data = [
+            {"agenda_item": self.ai.pk, "body": "Good"},
+            {"agenda_item": -1, "body": "Bad"},
+            {"agenda_item": self.ai.pk, "body": "Also good"},
+        ]
+        self.client.force_login(self.moderator)
+        count = self.ai.proposals.count()
+        response = self.client.post(url, data, format="json")
+        self.assertEqual(400, response.status_code)
+        self.assertEqual(count, self.ai.proposals.count())
+
+    def test_bulk_create_permission(self):
+        url = reverse("proposal-bulk-create")
+        data = [{"agenda_item": self.ai.pk, "body": "Hello"}]
+        for user, status in (
+            (None, 401),
+            (self.participant, 403),
+            (self.proposer, 201),
+        ):
+            if user:
+                self.client.force_login(user)
+            response = self.client.post(url, data, format="json")
+            self.assertEqual(status, response.status_code, user)
+
+    def test_bulk_create_diff_proposal(self):
+        url = reverse("proposal-bulk-create")
+        data = [
+            {
+                "agenda_item": self.ai.pk,
+                "body": "Hello world!",
+                "shortname": "diff_proposal",
+                "paragraph": self.para.pk,
+            }
+        ]
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, data, format="json")
+        self.assertEqual(201, response.status_code, response.json())
+        self.assertEqual(1, self.para.proposals.count())
+        self.assertIn("body_diff_brief", response.json()[0])
 
     @patch.object(ParticipantsChannel, "sync_publish")
     def test_transition_on_diff_triggers_correct_push(self, mock_publish):
