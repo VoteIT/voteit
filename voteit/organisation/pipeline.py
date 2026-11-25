@@ -378,6 +378,14 @@ def _merge_unused(backend, uid: str, session_user, accounts: list) -> None:
             target.pk,
             exc,
         )
+    except Exception:
+        # A bug, not a refusal. The login falls back to asking the person.
+        logger.exception(
+            "Silent merge at login failed. Organisation: %s, target: %s, users: %s",
+            backend.organisation.pk,
+            target.pk,
+            [account.pk for account in unused],
+        )
 
 
 def _settle(backend, social, session_user, chosen) -> dict:

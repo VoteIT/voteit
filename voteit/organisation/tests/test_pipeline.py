@@ -982,6 +982,21 @@ class ResolveIdentityAccountsTests(TestCase):
         self.assertIsNotNone(logs.records[0].exc_info)
         self.assertEqual(2, self.org.users.filter(is_active=True).count())
 
+    def test_silent_merge_failure_falls_back_to_asking(self):
+        self._make_user("used", used_in=self.meeting)
+        self._make_user("unused")
+        with (
+            patch(
+                "voteit.organisation.pipeline.UserMerger.run",
+                side_effect=RuntimeError("boom"),
+            ),
+            self.assertLogs("voteit.organisation.pipeline", "ERROR") as logs,
+        ):
+            self._run()
+        self.assertEqual("/choose-account?partial_token=a-token", self._asked())
+        self.assertIsNotNone(logs.records[0].exc_info)
+        self.assertEqual(2, self.org.users.filter(is_active=True).count())
+
     def test_merge_refused_for_elevated(self):
         a = self._make_user("a", used_in=self.meeting)
         self._make_user("b", used_in=self.other_meeting)
