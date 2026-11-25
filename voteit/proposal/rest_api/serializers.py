@@ -61,7 +61,8 @@ class GenericCreateProposalSerializer(serializers.Serializer):
             raise exceptions.ValidationError({"shortname": "Required"})
         try:
             serializer = cls.registry[shortname]
-        except KeyError:
+        except (KeyError, TypeError):
+            # TypeError: unhashable, e.g. a list
             raise exceptions.ValidationError({"shortname": "No such type"})
         return serializer(*args, **kwargs)
 

@@ -271,15 +271,17 @@ class ProposalsAPITests(APITestCase):
             {"agenda_item": self.ai.pk, "body": "Good"},
             {"agenda_item": -1, "body": "Bad"},
             {"agenda_item": self.ai.pk, "body": "Bad", "shortname": "nope"},
+            {"agenda_item": self.ai.pk, "body": "Bad", "shortname": []},
         ]
         self.client.force_login(self.moderator)
         response = self.client.post(url, data, format="json")
         self.assertEqual(400, response.status_code)
         errors = response.json()
-        self.assertEqual(3, len(errors))
+        self.assertEqual(4, len(errors))
         self.assertEqual({}, errors[0])
         self.assertIn("agenda_item", errors[1])
         self.assertIn("shortname", errors[2])
+        self.assertIn("shortname", errors[3])
 
     def test_bulk_create(self):
         url = reverse("proposal-bulk-create")
