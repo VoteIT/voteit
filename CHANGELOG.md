@@ -11,6 +11,10 @@
   response gives `switch_to`. Otherwise it gives a partly masked name and the last login.
 - **User merge**: Merges are auditlogged, lock both accounts, and combine group memberships instead of dropping
   the source's votes.
+- **Removal requests keep the log trail**: Users who made log entries are anonymised rather than deleted, even when
+  the meetings they took part in have since been deleted. The new classification `log_trail` is anonymised
+  without waiting for a manager. Removal reports include `log_entries`. Only users with no activity and no log
+  entries are deleted now.
 
 ## 1.7.0 (2026-11-17)
 

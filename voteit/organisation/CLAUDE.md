@@ -132,7 +132,7 @@ Org managers only. `list` / `retrieve` (by user pk) of the organisation's users 
 `voteit.core.removal.get_removal_reports` (batched, so `list` costs the same for any
 number of requests): `classification`, `organisation_roles`, per-meeting `meetings` (roles,
 `used_invite`, `groups`, counts of `proposals`, `discussion_posts`,
-`votes`, `speaker_entries`, `ongoing_polls`, `vote_transfers` and `reactions`) and
+`votes`, `speaker_entries`, `ongoing_polls`, `vote_transfers` and `reactions`), `log_entries` and
 `removable_after`. `can_remove` is false until
 `removable_after` has passed, and always false for the manager's own account.
 

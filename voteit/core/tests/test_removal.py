@@ -3,6 +3,7 @@ from unittest.mock import MagicMock
 from unittest.mock import patch
 from urllib.parse import urlencode
 
+from auditlog.context import set_actor
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.test import TestCase
@@ -11,9 +12,11 @@ from django.urls import reverse
 from django.utils.timezone import now
 from rest_framework.test import APITestCase
 from rq.exceptions import NoSuchJobError
+from social_django.models import UserSocialAuth
 
 from voteit.core.removal import ACTIVE_MEETING
 from voteit.core.removal import INACTIVE_MEETINGS
+from voteit.core.removal import LOG_TRAIL
 from voteit.core.removal import NO_ACTIVITY
 from voteit.core.removal import ONGOING_POLL
 from voteit.core.removal import ORGANISATION_ROLES
@@ -194,6 +197,23 @@ class RemoveInactiveUserTests(TestCase):
         self.assertEqual(1, len(mail.outbox))
         self.assertIn("abort-removal", mail.outbox[0].body)
 
+    def test_log_trail_anonymised(self):
+        """Their meeting is gone, but what they did in it is still logged."""
+        meeting = Meeting.objects.create(organisation=self.organisation, title="Gone")
+        with set_actor(self.user):
+            meeting.agenda_items.create().proposals.create(author=self.user)
+        meeting.delete()
+        result, end_sessions, close = self._run()
+        self.assertEqual(f"Anonymised user {self.user.pk}", result)
+        self.user.refresh_from_db()
+        self.assertIsNotNone(self.user.anonymised)
+        end_sessions.assert_called_once_with(self.user.pk)
+        close.assert_called_once()
+        self.assertEqual(1, len(mail.outbox))
+        msg = mail.outbox[0]
+        self.assertEqual(["nobody@voteit.se"], msg.to)
+        self.assertEqual("Your account has been removed", msg.subject)
+
     def test_active_user_kept(self):
         self.user.meeting_roles.create(context_id=1, assigned=["pa"])
         self._run()
@@ -342,6 +362,42 @@ class RemovalReportTests(TestCase):
         self.assertEqual(NO_ACTIVITY, report.classification)
         self.assertEqual([], report.meetings)
 
+    def test_log_trail(self):
+        user = self.meeting.organisation.users.create(
+            username="former", removal_requested=now()
+        )
+        meeting = Meeting.objects.create(
+            organisation=self.meeting.organisation, title="Gone"
+        )
+        with set_actor(user):
+            meeting.agenda_items.create().proposals.create(author=user)
+        meeting.delete()
+        report = get_removal_report(user)
+        self.assertEqual(LOG_TRAIL, report.classification)
+        self.assertEqual([], report.meetings)
+        self.assertGreater(report.log_entries, 0)
+
+    def test_own_account_isnt_a_log_trail(self):
+        user = self.meeting.organisation.users.create(
+            username="nobody", removal_requested=now()
+        )
+        with set_actor(user):
+            user.first_name = "Nobody"
+            user.save()
+            UserSocialAuth.objects.create(user=user, provider="idproxy", uid="x")
+        report = get_removal_report(user)
+        self.assertEqual(NO_ACTIVITY, report.classification)
+        self.assertEqual(0, report.log_entries)
+
+    def test_editing_another_user_is_a_log_trail(self):
+        user = self.meeting.organisation.users.create(
+            username="former_manager", removal_requested=now()
+        )
+        with set_actor(user):
+            self.participant.first_name = "Renamed"
+            self.participant.save()
+        self.assertEqual(LOG_TRAIL, get_removal_report(user).classification)
+
     def test_org_roles(self):
         manager = User.objects.get(username="org_manager")
         manager.removal_requested = now()
@@ -411,7 +467,7 @@ class RemovalReportTests(TestCase):
             method_name="simple", electoral_register=er, state="closed"
         )
         Vote.objects.create(user=self.participant, poll=poll, abstain=True)
-        with self.assertNumQueries(12):
+        with self.assertNumQueries(13):
             report = get_removal_report(self.participant)
         meeting = report.meetings[0]
         self.assertEqual(["Board"], meeting.groups)

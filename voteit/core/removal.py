@@ -6,7 +6,8 @@ abort. That email is what protects against someone else requesting removal
 from the user's unattended computer.
 
 A user with nothing to review is instead removed when the delay is up, and the
-email confirms the removal.
+email confirms the removal. Deleted if nothing but their own account was ever
+logged, anonymised otherwise, so the audit trail keeps its actor.
 """
 
 from __future__ import annotations
@@ -145,14 +146,22 @@ def email_removal_requested(user_pk: int, requested: str, language: str):
         if organisation is None:
             raise ValueError(f"User {user_pk} has no organisation")
         email, context = user.email, _confirmation_context(user)
-        if get_removal_report(user).classification == NO_ACTIVITY and _delete_user(
-            user
-        ):
+        classification = get_removal_report(user).classification
+        if classification == NO_ACTIVITY and _delete_user(user):
             transaction.on_commit(lambda: end_user_access(user_pk))
             transaction.on_commit(
                 lambda: send_removal_confirmation(email, context, language)
             )
             return f"Removed user {user_pk}"
+        if classification == LOG_TRAIL:
+            from voteit.core.anonymise import anonymise_user
+
+            anonymise_user(user)
+            transaction.on_commit(lambda: clear_postponed_removal(user_pk))
+            transaction.on_commit(
+                lambda: send_removal_confirmation(email, context, language)
+            )
+            return f"Anonymised user {user_pk}"
     if not user.email:
         logger.info("User %s requested removal but has no email", user.pk)
         return
@@ -228,8 +237,8 @@ ANONYMISED = "anonymised"
 
 def remove_user(user, language: str) -> str:
     """
-    Remove a user who asked for it: deleted when nothing references them,
-    anonymised otherwise. Returns DELETED or ANONYMISED.
+    Remove a user who asked for it: deleted when nothing references them and
+    nothing they did was logged, anonymised otherwise. Returns DELETED or ANONYMISED.
 
     Run in a transaction with the row locked. The confirmation goes out after
     commit, in ``language``.
@@ -278,6 +287,9 @@ def send_removal_confirmation(email: str, context: dict, language: str) -> None:
 
 #: Classifications, least to most in need of care.
 NO_ACTIVITY = "no_activity"
+#: Nothing left in any meeting, but log entries they made. Deleting would leave
+#: those without an actor, so they're anonymised.
+LOG_TRAIL = "log_trail"
 INACTIVE_MEETINGS = "inactive_meetings"
 ACTIVE_MEETING = "active_meeting"
 ONGOING_POLL = "ongoing_poll"
@@ -311,6 +323,8 @@ class RemovalReport:
     organisation_roles: list[str]
     meetings: list[MeetingInvolvement]
     classification: str
+    #: Log entries the user made, outside their own account and login methods.
+    log_entries: int = 0
     postponed: dict | None = None
 
 
@@ -336,7 +350,11 @@ def get_removal_reports(users) -> list[RemovalReport]:
     Expects users with removal_requested set. A fixed number of queries,
     whatever the number of users.
     """
+    from auditlog.models import LogEntry
+    from django.db.models import Count
+    from django.db.models import F
     from django.db.models import Q
+    from social_django.models import UserSocialAuth
 
     from voteit.discussion.models import DiscussionPost
     from voteit.invites.models import MeetingInvite
@@ -429,6 +447,24 @@ def get_removal_reports(users) -> list[RemovalReport]:
             "user_id", "button__meeting_id"
         )
     )
+    # Outlives whatever it's about, e.g. a deleted meeting. Entries on the
+    # user's own row and login methods go with the user anyway.
+    user_meta, social_meta = get_user_model()._meta, UserSocialAuth._meta
+    log_entries = dict(
+        LogEntry.objects.filter(actor__in=user_pks)
+        .exclude(
+            content_type__app_label=user_meta.app_label,
+            content_type__model=user_meta.model_name,
+            object_id=F("actor_id"),
+        )
+        .exclude(
+            content_type__app_label=social_meta.app_label,
+            content_type__model=social_meta.model_name,
+        )
+        .values("actor_id")
+        .annotate(count=Count("id"))
+        .values_list("actor_id", "count")
+    )
 
     per_user = {
         user_pk: set().union(
@@ -487,6 +523,8 @@ def get_removal_reports(users) -> list[RemovalReport]:
             classification = ACTIVE_MEETING
         elif involvements:
             classification = INACTIVE_MEETINGS
+        elif log_entries.get(user.pk):
+            classification = LOG_TRAIL
         else:
             classification = NO_ACTIVITY
         reports.append(
@@ -496,6 +534,7 @@ def get_removal_reports(users) -> list[RemovalReport]:
                 organisation_roles=user_org_roles,
                 meetings=involvements,
                 classification=classification,
+                log_entries=log_entries.get(user.pk, 0),
                 postponed=postponed.get(user.pk),
             )
         )

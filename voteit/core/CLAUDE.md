@@ -105,6 +105,8 @@ Cancelling the job on abort is therefore only tidiness, and a failed cancel can'
 stale email. Requesting again while a request stands keeps the original time and sends nothing.
 
 When the job runs on a user whose report says `no_activity`, it deletes the user instead.
+On `log_trail` it anonymises them instead (`anonymise_user`) and sends the removal confirmation;
+there's nothing for a manager to judge, but deleting would leave their log entries without an actor.
 It holds a row lock, so an abort can't slip in between the check and the delete. The abort
 takes the same lock and only clears the request it was given, on a row that isn't
 anonymised, so losing that race is a 400 rather than a 500 or a false success. A user
@@ -116,7 +118,7 @@ email goes out instead.
 
 `remove_user(user, language)` is the manager's removal (see `RemovalRequestsViewSet.remove`
 in `voteit.organisation`). It deletes the user when the report says `no_activity` and the
-delete isn't blocked, and calls `anonymise_user` otherwise. Either way it ends access,
+delete isn't blocked, and calls `anonymise_user` otherwise (`log_trail` included). Either way it ends access,
 cancels the queued email, clears any postpone and sends the removal confirmation after commit. The caller holds the row lock.
 `end_user_access(user_pk)` (`sessions.py`) is the shared "log out everywhere" for code
 running outside the user's own request.
@@ -137,11 +139,14 @@ score, because managers can't read a number. Per meeting, it reports roles, used
 group titles, and counts of proposals, discussion posts, votes, speaker entries,
 ongoing polls the user can vote in, vote transfers (given or received) and reactions.
 Vote transfers and reactions cascade on delete, so they are there to keep such a user
-out of `no_activity`. It costs 12 queries for any number of users.
+out of `no_activity`. `log_entries` counts the auditlog entries the user is actor of,
+except those on their own `User` row and on `UserSocialAuth` (both go with the user). It costs
+13 queries for any number of users.
 
 A meeting is listed if any of these touch it, so content outlives removed roles.
-`classification`, least to most in need of care: `no_activity` (nothing listed, left for a
-future job), `inactive_meetings`, `active_meeting` (upcoming or ongoing),
+`classification`, least to most in need of care: `no_activity` (nothing listed and no
+`log_entries`, the only class that is deleted), `log_trail` (no meeting listed, but
+`log_entries`: e.g. everything they did was in a meeting since deleted), `inactive_meetings`, `active_meeting` (upcoming or ongoing),
 `ongoing_poll` (in the electoral register of an ongoing poll), `organisation_roles`
 (trumps the rest: it changes who runs the organisation). `removable_after` is the request
 time plus `REMOVAL_WAIT_HOURS` (default 3), which gives the owner time to abort.

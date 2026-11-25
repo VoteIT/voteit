@@ -304,9 +304,14 @@ class RemovalRequestSerializer(serializers.Serializer):
     organisation_roles = serializers.ListField(child=serializers.CharField())
     classification = serializers.CharField(
         help_text=(
-            "no_activity, inactive_meetings, active_meeting, ongoing_poll or "
-            "organisation_roles -- least to most in need of care."
+            "no_activity, log_trail, inactive_meetings, active_meeting, "
+            "ongoing_poll or organisation_roles -- least to most in need of care. "
+            "Only no_activity users are deleted, everyone else is anonymised."
         )
+    )
+    log_entries = serializers.IntegerField(
+        help_text="Log entries the user made. They outlive deleted meetings, "
+        "so they can be all that is left."
     )
     meetings = MeetingInvolvementSerializer(many=True)
     postponed = PostponeRemovalSerializer(
