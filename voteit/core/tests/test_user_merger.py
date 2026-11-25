@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from unittest.mock import patch
+
 from django.test import TestCase
 
 from voteit.core.user_merger import UserMerger
@@ -485,6 +487,37 @@ class GroupMembershipTests(TestCase):
             total=Sum("votes")
         )["total"]
         self.assertEqual(2, total)
+
+    def test_changed_memberships_are_published(self):
+        from voteit.meeting.messages import GroupMembershipChanged
+        from voteit.meeting.models import GroupMembership
+
+        moved = GroupMembership.objects.create(
+            meeting_group=self.group, user=self.source
+        )
+        GroupMembership.objects.create(
+            meeting_group=self.shared, user=self.source, votes=1
+        )
+        combined = GroupMembership.objects.create(
+            meeting_group=self.shared, user=self.target, votes=1
+        )
+        with patch("voteit.meeting.signals.broadcast_meeting") as broadcast:
+            UserMerger(self.source, self.target).run()
+        sent = {
+            call.args[1].payload.pk: call.args[1].payload.model_dump()
+            for call in broadcast.call_args_list
+            if isinstance(call.args[1], GroupMembershipChanged)
+        }
+        self.assertEqual(self.target.pk, sent[moved.pk]["user"])
+        self.assertEqual(2, sent[combined.pk]["votes"])
+
+    def test_dry_run_publishes_nothing(self):
+        from voteit.meeting.models import GroupMembership
+
+        GroupMembership.objects.create(meeting_group=self.group, user=self.source)
+        with patch("voteit.meeting.signals.broadcast_meeting") as broadcast:
+            UserMerger(self.source, self.target, dry_run=True).run()
+        broadcast.assert_not_called()
 
     def test_dry_run_leaves_memberships(self):
         from voteit.meeting.models import GroupMembership

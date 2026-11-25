@@ -195,6 +195,8 @@ class UserMerger:
         #: Correlation id on every auditlog entry of this merge.
         self.cid = f"user-merge-{uuid4().hex}"
         self.log = MergeLog()
+        #: GroupMembership pks changed with update(), published after the merge.
+        self._changed_memberships: set[int] = set()
 
     def run(self) -> MergeLog:
         cid_token = correlation_id.set(self.cid)
@@ -218,6 +220,7 @@ class UserMerger:
                     transaction.set_rollback(True)
                 else:
                     self._log_merge()
+                    self._publish_memberships()
         finally:
             _merge_actor.reset(actor_token)
             correlation_id.reset(cid_token)
@@ -337,6 +340,7 @@ class UserMerger:
             if not self.dry_run:
                 GroupMembership.objects.filter(pk=src.pk).update(user=self.target)
                 log_reassignment(src, "user", self.source, self.target)
+                self._changed_memberships.add(src.pk)
             self.log.moved.append(
                 f"GroupMembership pk={src.pk} (meeting_group_id={src.meeting_group_id}) moved"
             )
@@ -362,11 +366,13 @@ class UserMerger:
                 type(tgt).objects.filter(pk=tgt.pk).update(**changes)
                 for name, value in changes.items():
                     self._log_membership_change(tgt, name, getattr(tgt, name), value)
+                self._changed_memberships.add(tgt.pk)
                 if src.votes:
                     # Usually deleted with the source's meeting roles, but it may
                     # have none in this meeting. Either way its votes are moved.
                     type(src).objects.filter(pk=src.pk).update(votes=0)
                     self._log_membership_change(src, "votes", src.votes, 0)
+                    self._changed_memberships.add(src.pk)
             self.log.merged_roles.append(
                 f"GroupMembership pk={src.pk} (meeting_group_id={src.meeting_group_id}): "
                 f"merged into pk={tgt.pk} ({', '.join(sorted(changes))})"
@@ -376,6 +382,21 @@ class UserMerger:
                 f"GroupMembership pk={src.pk} (meeting_group_id={src.meeting_group_id}) "
                 f"skipped: target already a member, removed with the source's meeting roles"
             )
+
+    def _publish_memberships(self) -> None:
+        """
+        update() sends no post_save, so clients would keep the old state.
+        """
+        if not self._changed_memberships:
+            return
+        from voteit.meeting.models import GroupMembership
+        from voteit.meeting.signals import context_changed_publish_to_meeting
+
+        # Refetched: some may have been deleted since, and those got their own message.
+        for membership in GroupMembership.objects.filter(
+            pk__in=self._changed_memberships
+        ).select_related("meeting_group__meeting"):
+            context_changed_publish_to_meeting(membership, sender=GroupMembership)
 
     @staticmethod
     def _log_membership_change(obj, name, old, new) -> None:
