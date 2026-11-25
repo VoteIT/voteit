@@ -1,7 +1,8 @@
+import re
 from datetime import timedelta
 from unittest.mock import MagicMock
 from unittest.mock import patch
-from urllib.parse import urlencode
+from urllib.parse import parse_qs
 
 from auditlog.context import set_actor
 from django.contrib.auth import get_user_model
@@ -105,8 +106,11 @@ class EmailJobTests(RemovalTestMixin, TestCase):
         self.assertEqual(1, len(mail.outbox))
         msg = mail.outbox[0]
         self.assertEqual(["participant@voteit.se"], msg.to)
-        token = make_abort_token(self.user)
-        self.assertIn(f"/abort-removal?{urlencode({'token': token})}", msg.body)
+        # Tokens carry a timestamp, so one made here may not match the email's
+        match = re.search(r"/abort-removal\?(\S+)", msg.body)
+        self.assertIsNotNone(match)
+        token = parse_qs(match.group(1))["token"][0]
+        self.assertEqual(self.user, get_user_from_abort_token(token))
 
     def test_stale_request(self):
         requested = self.user.removal_requested.isoformat()
