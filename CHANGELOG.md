@@ -15,6 +15,9 @@
   the meetings they took part in have since been deleted. The new classification `log_trail` is anonymised
   without waiting for a manager. Removal reports include `log_entries`. Only users with no activity and no log
   entries are deleted now.
+- **Active users with dialects**: A dialect that configures `active_users` no longer enables it on an upcoming
+  meeting, so people entering before the start aren't marked as active. It's enabled when the meeting goes ongoing.
+  Components opt in with the new adapter flag `enable_on_start_when_required`.
 
 ## 1.7.0 (2026-11-17)
 

@@ -1,9 +1,11 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
+from unittest import mock
 from pydantic import ValidationError
 
 
+from voteit.active.components import ActiveUsersComponent
 from voteit.components.app.components.dialects import DialectsFilter
 from voteit.components.app.components.irv import RepeatedIRV
 from voteit.components.app.components.message import FlashMessage
@@ -11,6 +13,7 @@ from voteit.meeting.dialects import get_named_paths
 from voteit.meeting.exceptions import DialectError
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_DISCUSSER
+from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PROPOSER
 from voteit.meeting.tests.fixtures import CYCLIC_DIALECT_FIXTURES
 from voteit.meeting.tests.fixtures import DIALECT_FIXTURES
@@ -49,6 +52,11 @@ dialect_with_component.update(
         ],
     }
 )
+dialect_with_active_users = {
+    "title": "Active",
+    "name": "active",
+    "configure_components": [{"name": ActiveUsersComponent.name}],
+}
 dialect_minimal = {"title": "Mini", "name": "mini"}
 dialect_minimal_requires_test = {"title": "Req", "name": "req", "requires": ["test"]}
 dialect_with_tags_component = {
@@ -229,6 +237,44 @@ class DialectHandlerTests(TestCase):
         self.assertTrue(component.enabled)
         component_to_block.refresh_from_db()
         self.assertFalse(component_to_block.enabled)
+
+    def test_install_defers_components_enabled_on_start(self):
+        handler = self._cut.load_from_dict(dialect_with_active_users)
+        handler.install(self.meeting)
+        component = self.meeting.components.get(
+            component_name=ActiveUsersComponent.name
+        )
+        self.assertFalse(component.enabled)
+        handler.start(self.meeting)
+        component.refresh_from_db()
+        self.assertTrue(component.enabled)
+
+    def test_install_on_ongoing_meeting_enables_directly(self):
+        self.meeting.state = "ongoing"
+        handler = self._cut.load_from_dict(dialect_with_active_users)
+        handler.install(self.meeting)
+        component = self.meeting.components.get(
+            component_name=ActiveUsersComponent.name
+        )
+        self.assertTrue(component.enabled)
+
+    def test_meeting_ongoing_enables_deferred_components(self):
+        from voteit.poll.app.er_policies.auto_always import AutoAlways
+
+        moderator = User.objects.create(username="mod")
+        self.meeting.add_roles(moderator, ROLE_MODERATOR)
+        handler = self._cut.load_from_dict(dialect_with_active_users)
+        handler.install(self.meeting)
+        self.meeting.er_policy_name = AutoAlways.name
+        with mock.patch(
+            "voteit.meeting.signals.dialect_registry.get_merged_handler",
+            return_value=handler,
+        ):
+            self.meeting.make_ongoing(user=moderator)
+        component = self.meeting.components.get(
+            component_name=ActiveUsersComponent.name
+        )
+        self.assertTrue(component.enabled)
 
     def test_install_participant_tags(self):
         handler = self._cut.load_from_dict(dialect_with_tags_component)

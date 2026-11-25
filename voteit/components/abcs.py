@@ -127,6 +127,9 @@ class ComponentAdapter(ABC):
     disable_on_close
         Disable component when meeting closes
 
+    enable_on_start_when_required
+        Only for components required by a dialect: keep disabled until the meeting is ongoing
+
     Not implemented yet:
     multiple
         If context can have multiple instances of this component.
@@ -134,6 +137,7 @@ class ComponentAdapter(ABC):
 
     schema: type[BaseModel] | None = None
     disable_on_close: bool = False
+    enable_on_start_when_required: bool = False
     # multiple: bool = False
 
     @property

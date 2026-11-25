@@ -21,10 +21,12 @@ from typing import Generator
 from yaml import safe_load
 
 from voteit.components.app.components.dialects import DialectsFilter
+from voteit.components.utils import get_meeting_component_adapters
 from voteit.core.decorators import ensure_atomic
 from voteit.meeting.exceptions import DialectError
 from voteit.meeting.models import Meeting
 from voteit.meeting.schemas import DialectSchema
+from voteit.meeting.statemachines import MeetingStateMachine
 
 if TYPE_CHECKING:
     from voteit.organisation.models import Organisation
@@ -226,6 +228,11 @@ class DialectHandler:
                 component_name=cs.name,
                 defaults={"settings_data": cs.settings, "enabled": False},
             )
+            if (
+                component.adapter.enable_on_start_when_required
+                and meeting.state != MeetingStateMachine.ongoing.value
+            ):
+                continue  # Enabled by start() when the meeting goes ongoing
             component.enable()
             component.save()
         # Configure rooms and speaker lists
@@ -256,6 +263,24 @@ class DialectHandler:
         # And install scripts
         for script in self.load_dialect_scripts():
             script.install(meeting)
+
+    def start(self, meeting: Meeting):
+        """
+        Enable components that were deferred on install. Called when the meeting goes ongoing.
+        """
+        adapters = get_meeting_component_adapters()
+        names = [
+            cs.name
+            for cs in self.data.configure_components
+            if adapters[cs.name].enable_on_start_when_required
+        ]
+        if not names:
+            return
+        for component in meeting.components.filter(
+            component_name__in=names, enabled=False
+        ):
+            component.enable()
+            component.save()
 
     @ensure_atomic
     def remove(self, meeting: Meeting, groups: bool = False):

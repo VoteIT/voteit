@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from logging import getLogger
 from typing import TYPE_CHECKING
 
 from django.db import transaction
@@ -17,10 +18,12 @@ from voteit.core.decorators import on_transaction_commit
 from voteit.core.messages.role_updates import RolesChanged
 from voteit.core.messages.role_updates import RolesRemoved
 from voteit.core.role import Role
+from voteit.core.signals import after_sm_transition
 from voteit.core.signals import roles_added
 from voteit.core.signals import roles_removed
 from voteit.core.utils import get_model_shortname
 from voteit.meeting.channels import broadcast_meeting
+from voteit.meeting.dialects import dialect_registry
 from voteit.meeting.messages import GroupMembershipChanged
 from voteit.meeting.messages import GroupMembershipDeleted
 from voteit.meeting.messages import GroupRoleChanged
@@ -38,9 +41,12 @@ from voteit.meeting.rest_api.serializers import GroupMembershipSerializer
 from voteit.meeting.rest_api.serializers import GroupRoleSerializer
 from voteit.meeting.rest_api.serializers import MeetingDetailSerializer
 from voteit.meeting.rest_api.serializers import MeetingGroupSerializer
+from voteit.meeting.statemachines import MeetingStateMachine
 
 if TYPE_CHECKING:
     from voteit.core.abcs import MeetingContext
+
+logger = getLogger(__name__)
 
 # Signal providing an atomic transaction to do cleanup when a meeting is archived
 # Will provide argument "meeting"
@@ -314,3 +320,22 @@ def compat_m2m_publish_group_membership(
 #                 instance=obj,
 #                 using=using,
 #             )
+
+
+@receiver(after_sm_transition, sender=Meeting)
+def start_dialect_when_meeting_ongoing(instance: Meeting, target, **kw):
+    if (
+        target.value != MeetingStateMachine.ongoing.value
+        or not instance.installed_dialect
+    ):
+        return
+    try:
+        handler = dialect_registry.get_merged_handler(instance.installed_dialect)
+    except KeyError:
+        logger.error(
+            "Installed meeting dialect %s doesn't exist. Meeting pk: %s",
+            instance.installed_dialect,
+            instance.pk,
+        )
+    else:
+        handler.start(instance)
