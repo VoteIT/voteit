@@ -269,17 +269,32 @@ class DialectHandler:
         Enable components that were deferred on install. Called when the meeting goes ongoing.
         """
         adapters = get_meeting_component_adapters()
-        names = [
-            cs.name
-            for cs in self.data.configure_components
-            if adapters[cs.name].enable_on_start_when_required
-        ]
+        names = []
+        for cs in self.data.configure_components:
+            adapter = adapters.get(cs.name)
+            if adapter is None:
+                logger.warning(
+                    "Dialect %s configures unknown component %s",
+                    self.data.name,
+                    cs.name,
+                )
+            elif adapter.enable_on_start_when_required:
+                names.append(cs.name)
         if not names:
             return
         for component in meeting.components.filter(
             component_name__in=names, enabled=False
         ):
-            component.enable()
+            # Must never block the meeting from starting
+            try:
+                component.enable()
+            except ValueError:
+                logger.exception(
+                    "Couldn't enable component %s on meeting %s",
+                    component.component_name,
+                    meeting.pk,
+                )
+                continue
             component.save()
 
     @ensure_atomic

@@ -249,6 +249,31 @@ class DialectHandlerTests(TestCase):
         component.refresh_from_db()
         self.assertTrue(component.enabled)
 
+    def test_start_skips_unknown_component(self):
+        handler = self._cut.load_from_dict(dialect_with_active_users)
+        with (
+            mock.patch(
+                "voteit.meeting.dialects.get_meeting_component_adapters",
+                return_value={},
+            ),
+            self.assertLogs("voteit.meeting.dialects", "WARNING"),
+        ):
+            handler.start(self.meeting)
+
+    def test_start_skips_component_with_invalid_settings(self):
+        handler = self._cut.load_from_dict(dialect_with_active_users)
+        handler.install(self.meeting)
+        component = self.meeting.components.get(
+            component_name=ActiveUsersComponent.name
+        )
+        with (
+            mock.patch.object(type(component), "valid_settings", return_value=False),
+            self.assertLogs("voteit.meeting.dialects", "ERROR"),
+        ):
+            handler.start(self.meeting)
+        component.refresh_from_db()
+        self.assertFalse(component.enabled)
+
     def test_install_on_ongoing_meeting_enables_directly(self):
         self.meeting.state = "ongoing"
         handler = self._cut.load_from_dict(dialect_with_active_users)
