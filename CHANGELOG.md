@@ -10,7 +10,8 @@
   that another account accepted, for upcoming and ongoing meetings. If that account has the same identity, the
   response gives `switch_to`. Otherwise it gives a partly masked name and the last login.
 - **User merge**: Merges are auditlogged, lock both accounts, and combine group memberships instead of dropping
-  the source's votes.
+  the source's votes. Admin change history stays on the merged-away account, and changed memberships are pushed
+  to clients.
 - **Removal requests keep the log trail**: Users who made log entries are anonymised rather than deleted, even when
   the meetings they took part in have since been deleted. The new classification `log_trail` is anonymised
   without waiting for a manager. Removal reports include `log_entries`. Only users with no activity and no log
@@ -18,6 +19,9 @@
 - **Active users with dialects**: A dialect that configures `active_users` no longer enables it on an upcoming
   meeting, so people entering before the start aren't marked as active. It's enabled when the meeting goes ongoing.
   Components opt in with the new adapter flag `enable_on_start_when_required`.
+- **Several proposals per request**: `POST /api/proposals/preview/` takes and returns a list (max 20); a single
+  object now gives 400. New `POST /api/proposals/bulk-create/` saves all or nothing.
+- **Bugfix** - A broken dialect component no longer stops a meeting from starting.
 
 ## 1.7.0 (2026-11-17)
 
