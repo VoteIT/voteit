@@ -463,6 +463,29 @@ class GroupMembershipTests(TestCase):
         self.assertEqual(self.group, self._memberships(self.target).get().meeting_group)
         self.assertTrue(self.meeting.has_roles(self.target, "pv"))
 
+    def test_shared_group_votes_not_counted_twice(self):
+        """
+        The source has no meeting roles here, so nothing deletes its
+        membership. Its votes must still only be counted once.
+        """
+        from django.db.models import Sum
+
+        from voteit.meeting.models import GroupMembership
+
+        GroupMembership.objects.create(
+            meeting_group=self.shared, user=self.source, votes=1
+        )
+        GroupMembership.objects.create(
+            meeting_group=self.shared, user=self.target, votes=1
+        )
+        self.assertIsNone(self.meeting.get_roles(self.source))
+        UserMerger(self.source, self.target).run()
+        self.assertEqual(2, self._memberships(self.target).get().votes)
+        total = GroupMembership.objects.filter(meeting_group=self.shared).aggregate(
+            total=Sum("votes")
+        )["total"]
+        self.assertEqual(2, total)
+
     def test_dry_run_leaves_memberships(self):
         from voteit.meeting.models import GroupMembership
 

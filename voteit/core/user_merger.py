@@ -362,6 +362,11 @@ class UserMerger:
                 type(tgt).objects.filter(pk=tgt.pk).update(**changes)
                 for name, value in changes.items():
                     self._log_membership_change(tgt, name, getattr(tgt, name), value)
+                if src.votes:
+                    # Usually deleted with the source's meeting roles, but it may
+                    # have none in this meeting. Either way its votes are moved.
+                    type(src).objects.filter(pk=src.pk).update(votes=0)
+                    self._log_membership_change(src, "votes", src.votes, 0)
             self.log.merged_roles.append(
                 f"GroupMembership pk={src.pk} (meeting_group_id={src.meeting_group_id}): "
                 f"merged into pk={tgt.pk} ({', '.join(sorted(changes))})"
