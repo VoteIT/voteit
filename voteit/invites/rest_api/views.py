@@ -3,6 +3,7 @@ from itertools import groupby
 from logging import getLogger
 
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import models
 from django.db import transaction
 from django.utils.functional import cached_property
 from django.utils.translation import gettext as _
@@ -27,11 +28,13 @@ from voteit.invites.models import MeetingInvite
 from voteit.invites.rest_api import serializers
 from voteit.invites.schemas import InviteDataTypesSchema
 from voteit.invites.schemas import InvitesResultSchema
+from voteit.invites.statemachines import InviteStateMachine
 from voteit.invites.utils import get_invite_adapter_registry
 from voteit.invites.utils import send_updated_invites
 from voteit.meeting.rest_api.filters import ForceMeetingWithRoleFilter
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.statemachines import MeetingStateMachine
+from voteit.meeting.utils import active_meetings_by_user
 from voteit.organisation.utils import get_user_identity_data
 from voteit.organisation.utils import get_user_member_ids
 
@@ -522,12 +525,11 @@ class HandleMatchedInvitesViewSet(
     no explicit object-level permission check is performed.
     """
 
-    serializer_class = serializers.ExternalMeetingInviteSerializer
+    serializer_class = serializers.MatchedInviteSerializer
 
-    def get_queryset(self):
-        organisation = self.request.user.organisation
-        if organisation is None:
-            raise ValidationError(_("Organisation required"))
+    @cached_property
+    def matched_data(self) -> dict[str, set[str]]:
+        """The user's identity data that the invite system indexes."""
         # Providers vouch for more than the invite system indexes -- ScoutID
         # also sends a membership number -- so keep only what has an adapter.
         reg = get_invite_adapter_registry()
@@ -538,11 +540,77 @@ class HandleMatchedInvitesViewSet(
         }
         if member_ids := get_user_member_ids(self.request.user):
             matched[InviteMemberId.name] = member_ids
-        if matched:
-            return MeetingInvite.objects.find_open_invites(
-                organisation=organisation, **matched
+        return matched
+
+    @property
+    def include_used(self) -> bool:
+        return self.action == "list" and self.request.query_params.get(
+            "include_used"
+        ) in ("1", "true")
+
+    def get_queryset(self):
+        organisation = self.request.user.organisation
+        if organisation is None:
+            raise ValidationError(_("Organisation required"))
+        if not self.matched_data:
+            return MeetingInvite.objects.none()
+        qs = MeetingInvite.objects.find_invites(
+            organisation=organisation, **self.matched_data
+        )
+        open_q = models.Q(state=InviteStateMachine.open.id)
+        if self.include_used:
+            # Invites this person used with another account, while that still
+            # matters. Their own are already handled.
+            used_q = models.Q(
+                state=InviteStateMachine.accepted.id,
+                # Negating used_by=user alone would also match NULL
+                used_by__isnull=False,
+                meeting__state__in=(
+                    MeetingStateMachine.upcoming.value,
+                    MeetingStateMachine.ongoing.value,
+                ),
+            ) & ~models.Q(used_by=self.request.user)
+            return qs.filter(open_q | used_q).select_related(
+                "meeting__organisation", "used_by"
             )
-        return MeetingInvite.objects.none()
+        return qs.filter(open_q).select_related("meeting__organisation")
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["matched_data"] = self.matched_data
+        return context
+
+    def list(self, request, *args, **kwargs):
+        """
+        GET /api/handle-matched-invites/
+
+        Open invites matching the user's own identity data.
+
+        With ``?include_used=1``, also invites to upcoming or ongoing meetings
+        that another account already accepted. Those have
+        ``used_elsewhere: true`` and a ``used_by_account`` hint. When that
+        account shares the user's ``identity_id``, ``switch_to`` holds its pk
+        for ``POST /api/user/{pk}/switch/``, and nothing is masked. Otherwise
+        names are partly masked, and ``user_data`` only holds the keys that
+        matched.
+
+        An account it can switch to also has ``meetings`` (at most five
+        upcoming or ongoing, ``{pk, title, state}``) and ``meeting_count``.
+        """
+        invites = list(self.filter_queryset(self.get_queryset()))
+        switchable = {
+            inv.used_by
+            for inv in invites
+            if inv.used_by_id
+            and inv.used_by_id != request.user.pk
+            and serializers.can_switch(request.user, inv.used_by)
+        }
+        context = self.get_serializer_context()
+        context["account_meetings"] = (
+            active_meetings_by_user(switchable) if switchable else {}
+        )
+        serializer = self.get_serializer(invites, many=True, context=context)
+        return Response(serializer.data)
 
     @action(
         methods=["post"],

@@ -19,6 +19,7 @@ from voteit.invites.rest_api.lock import invites_lock
 from voteit.invites.statemachines import InviteStateMachine
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
+from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation.models import Organisation
 from voteit.organisation.testing import ALT_DUMMY_PROVIDER
@@ -328,6 +329,155 @@ class UserMatchedInviteViewSetTests(APITestCase):
         url = reverse("handle-matched-invites-list")
         response = self.client.get(url)
         self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+
+
+class UserMatchedUsedInviteTests(APITestCase):
+    """Invites another account already used, with ``include_used``."""
+
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.organisation: Organisation = Organisation.objects.get(pk=1)
+        cls.meeting: Meeting = Meeting.objects.create(
+            title="Test meeting", state="ongoing", organisation=cls.organisation
+        )
+        cls.user: User = User.objects.create_user(
+            "second", organisation=cls.organisation, identity_id="abc"
+        )
+        cls.user.social_auth.create(
+            provider=IDPROXY_PROVIDER,
+            uid="abc",
+            extra_data={"user_data": {"email": ["me@example.com"]}},
+        )
+        cls.other: User = User.objects.create_user(
+            "first",
+            organisation=cls.organisation,
+            first_name="Robin",
+            last_name="Harms Oredsson",
+        )
+        cls.invite: MeetingInvite = cls.meeting.invites.create(
+            user_data={"email": "me@example.com", "swedish_ssn": "190001019999"},
+        )
+
+    def setUp(self):
+        self.invite.refresh_from_db()
+        self.invite.accept(self.other)
+        self.invite.save()
+
+    def _list(self, include_used=True):
+        self.client.force_login(self.user)
+        url = reverse("handle-matched-invites-list")
+        response = self.client.get(url, {"include_used": 1} if include_used else {})
+        self.assertEqual(200, response.status_code, response.content)
+        return response.json()
+
+    def test_not_included_by_default(self):
+        self.assertEqual([], self._list(include_used=False))
+
+    def test_unrelated_account_is_masked(self):
+        data = self._list()
+        self.assertEqual(1, len(data))
+        item = data[0]
+        self.assertTrue(item["used_elsewhere"])
+        self.assertIsNone(item["switch_to"])
+        self.assertEqual(self.other.pk, item["used_by"])
+        self.assertEqual({"email": "me@example.com"}, item["user_data"])
+        self.assertEqual(
+            {
+                "pk": self.other.pk,
+                "first_name": "Ro*",
+                "last_name": "Ha* Ored*",
+                "last_login": None,
+            },
+            item["used_by_account"],
+        )
+
+    def test_same_identity_can_switch(self):
+        User.objects.filter(pk=self.other.pk).update(identity_id="abc")
+        item = self._list()[0]
+        self.assertEqual(self.other.pk, item["switch_to"])
+        self.assertEqual(self.other.pk, item["used_by"])
+        self.assertEqual(
+            {"email": "me@example.com", "swedish_ssn": "19000101"},
+            item["user_data"],
+        )
+        self.assertEqual("Robin", item["used_by_account"]["first_name"])
+        self.assertEqual(self.other.pk, item["used_by_account"]["pk"])
+        self.assertEqual(
+            [{"pk": self.meeting.pk, "title": "Test meeting", "state": "ongoing"}],
+            item["used_by_account"]["meetings"],
+        )
+        self.assertEqual(1, item["used_by_account"]["meeting_count"])
+
+    def test_switch_meetings_capped(self):
+        User.objects.filter(pk=self.other.pk).update(identity_id="abc")
+        for i in range(6):
+            Meeting.objects.create(
+                title=f"Other {i}", state="upcoming", organisation=self.organisation
+            ).add_roles(self.other, ROLE_PARTICIPANT)
+        Meeting.objects.create(
+            title="Closed", state="closed", organisation=self.organisation
+        ).add_roles(self.other, ROLE_PARTICIPANT)
+        account = self._list()[0]["used_by_account"]
+        self.assertEqual(7, account["meeting_count"])
+        self.assertEqual(
+            ["Other 0", "Other 1", "Other 2", "Other 3", "Other 4"],
+            [m["title"] for m in account["meetings"]],
+        )
+
+    def test_ssn_masked_on_open_invite(self):
+        meeting = Meeting.objects.create(
+            title="Other", state="upcoming", organisation=self.organisation
+        )
+        meeting.invites.create(
+            user_data={"email": "me@example.com", "swedish_ssn": "190001019999"}
+        )
+        item = self._list(include_used=False)[0]
+        self.assertEqual("19000101", item["user_data"]["swedish_ssn"])
+
+    def test_inactive_same_identity_cant_switch(self):
+        User.objects.filter(pk=self.other.pk).update(identity_id="abc", is_active=False)
+        item = self._list()[0]
+        self.assertIsNone(item["switch_to"])
+        self.assertEqual("Ro*", item["used_by_account"]["first_name"])
+
+    def test_closed_meeting_not_included(self):
+        Meeting.objects.filter(pk=self.meeting.pk).update(state="closed")
+        self.assertEqual([], self._list())
+
+    def test_own_invite_not_included(self):
+        MeetingInvite.objects.filter(pk=self.invite.pk).update(used_by=self.user)
+        self.assertEqual([], self._list())
+
+    def test_accepted_without_user_not_included(self):
+        MeetingInvite.objects.filter(pk=self.invite.pk).update(used_by=None)
+        self.assertEqual([], self._list())
+
+    def test_rejected_not_included(self):
+        MeetingInvite.objects.filter(pk=self.invite.pk).update(
+            state=InviteStateMachine.rejected.id
+        )
+        self.assertEqual([], self._list())
+
+    def test_open_still_listed(self):
+        meeting = Meeting.objects.create(
+            title="Other", state="upcoming", organisation=self.organisation
+        )
+        open_invite = meeting.invites.create(user_data={"email": "me@example.com"})
+        data = {x["pk"]: x for x in self._list()}
+        self.assertEqual({self.invite.pk, open_invite.pk}, set(data))
+        self.assertFalse(data[open_invite.pk]["used_elsewhere"])
+        self.assertIsNone(data[open_invite.pk]["used_by_account"])
+
+    def test_accept_used_invite_404(self):
+        self.client.force_login(self.user)
+        for name in ("accept", "reject"):
+            url = reverse(
+                f"handle-matched-invites-{name}", kwargs={"pk": self.invite.pk}
+            )
+            response = self.client.post(f"{url}?include_used=1")
+            self.assertEqual(404, response.status_code)
 
 
 @dummy_backend_enabled()

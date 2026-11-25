@@ -1,3 +1,4 @@
+import re
 from logging import getLogger
 
 from django.db import transaction
@@ -107,6 +108,87 @@ class ExternalMeetingInviteSerializer(serializers.ModelSerializer):
 
     def get_meeting_title(self, instance: MeetingInvite) -> str:
         return instance.meeting.title
+
+
+def mask_half(value: str) -> str:
+    """
+    Keep the first half of each name part.
+
+    >>> mask_half("Robin")
+    'Ro*'
+    >>> mask_half("Harms Oredsson")
+    'Ha* Ored*'
+    >>> mask_half("Anna-Karin")
+    'An*-Ka*'
+    """
+    if not value:
+        return value
+    return re.sub(r"[^\s-]+", lambda m: m[0][: len(m[0]) // 2] + "*", value)
+
+
+def can_switch(user, other) -> bool:
+    # Same rule as UserView.get_queryset, so switch accepts it.
+    return bool(
+        user.identity_id and other.is_active and other.identity_id == user.identity_id
+    )
+
+
+class MatchedInviteSerializer(ExternalMeetingInviteSerializer):
+    """
+    An invite as the person it matches sees it.
+
+    An invite another account used says something about that account, so how
+    much it shows depends on whether the requesting user could switch to it.
+    ``user_data`` is always masked by the invite adapters.
+
+    Adds ``used_elsewhere``, ``switch_to`` and ``used_by_account``. An account
+    the user can switch to also lists its first ``MAX_MEETINGS`` active meetings,
+    from ``account_meetings`` in the context, so the user can tell why to switch.
+    """
+
+    MAX_MEETINGS = 5
+
+    def to_representation(self, instance: MeetingInvite):
+        data = super().to_representation(instance)
+        request = self.context.get("request")
+        user = request.user if request else None
+        used_elsewhere = bool(
+            user and instance.used_by_id and instance.used_by_id != user.pk
+        )
+        can_switch_to = used_elsewhere and can_switch(user, instance.used_by)
+        user_data = instance.user_data
+        used_by_account = None
+        if used_elsewhere:
+            other = instance.used_by
+            if can_switch_to:
+                meetings = self.context.get("account_meetings", {}).get(other.pk, [])
+                used_by_account = {
+                    "pk": other.pk,
+                    "first_name": other.first_name,
+                    "last_name": other.last_name,
+                    "userid": other.userid,
+                    "last_login": other.last_login,
+                    "meetings": meetings[: self.MAX_MEETINGS],
+                    "meeting_count": len(meetings),
+                }
+            else:
+                used_by_account = {
+                    "pk": other.pk,
+                    "first_name": mask_half(other.first_name),
+                    "last_name": mask_half(other.last_name),
+                    "last_login": other.last_login,
+                }
+                matched = self.context.get("matched_data") or {}
+                user_data = {
+                    k: v for k, v in user_data.items() if v in matched.get(k, ())
+                }
+        data["user_data"] = get_invite_adapter_registry().get_masked_user_data(
+            user_data
+        )
+        data["used_elsewhere"] = used_elsewhere
+        data["switch_to"] = instance.used_by_id if can_switch_to else None
+        data["used_by_account"] = used_by_account
+        return data
 
 
 def _datacol_message(err: DataColValidationError) -> str:

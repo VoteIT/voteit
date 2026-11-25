@@ -6,6 +6,9 @@
   one or merge them (`/api/identity-account-options/`, new setting `CHOOSE_ACCOUNT_URL`). Unused duplicates are merged
   silently. Merges are refused for org managers, pending removals, accounts not tied to the identity, and accounts
   with votes, electoral registers or groups in the same meeting.
+- **Invites used by another account**: `GET /api/handle-matched-invites/?include_used=1` also lists matching invites
+  that another account accepted, for upcoming and ongoing meetings. If that account has the same identity, the
+  response gives `switch_to`. Otherwise it gives a partly masked name and the last login.
 - **User merge**: Merges are auditlogged, lock both accounts, and combine group memberships instead of dropping
   the source's votes.
 

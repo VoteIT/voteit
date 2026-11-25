@@ -47,3 +47,33 @@ def can_see_emails(user, meeting: Meeting | None = None) -> bool:
     if org is not None and user.has_perm(org.get_perm(PERM.MANAGE), org):
         return True
     return meeting is not None and meeting.has_roles(user, ROLE_MODERATOR)
+
+
+def active_meetings_by_user(users) -> dict[int, list[dict]]:
+    """
+    Upcoming and ongoing meetings each user has roles in, by title, as
+    ``{user_pk: [{pk, title, state}, ...]}``.
+    """
+    from voteit.meeting.models import MeetingRoles
+    from voteit.meeting.statemachines import MeetingStateMachine
+
+    meetings = {}
+    for row in (
+        MeetingRoles.objects.filter(
+            user__in=users,
+            context__state__in=(
+                MeetingStateMachine.upcoming.value,
+                MeetingStateMachine.ongoing.value,
+            ),
+        )
+        .order_by("context__title")
+        .values("user_id", "context_id", "context__title", "context__state")
+    ):
+        meetings.setdefault(row["user_id"], []).append(
+            {
+                "pk": row["context_id"],
+                "title": row["context__title"],
+                "state": row["context__state"],
+            }
+        )
+    return meetings

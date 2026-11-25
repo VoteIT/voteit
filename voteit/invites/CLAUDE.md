@@ -97,7 +97,7 @@ Outgoing only:
 See `rest_api/CLAUDE.md` for details. Summary:
 - `/api/meeting-invites/` — moderator CRUD + bulk actions.
 - `/api/match-invites/` — ID-proxy service endpoint (API key auth).
-- `/api/handle-matched-invites/` — authenticated user accept/reject.
+- `/api/handle-matched-invites/` — authenticated user accept/reject. `?include_used=1` also lists invites another account already used.
 - `/api/invite-data-types/` — lists available adapter types.
 
 ## Permissions

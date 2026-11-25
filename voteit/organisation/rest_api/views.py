@@ -39,8 +39,7 @@ from voteit.core.rest_api import router
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.core.rest_api.permissions import HasIDProxyAPIKey
 from voteit.core.rest_api.permissions import IsAuthenticated
-from voteit.meeting.models import MeetingRoles
-from voteit.meeting.statemachines import MeetingStateMachine
+from voteit.meeting.utils import active_meetings_by_user
 from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation.matching import find_candidates
 from voteit.organisation.matching import is_elevated
@@ -494,25 +493,7 @@ class IdentityAccountOptionsViewSet(viewsets.ViewSet):
         # Recomputed, never read back from the partial.
         uid = stored.kwargs.get("uid")
         accounts = find_identity_accounts(backend.organisation, uid)
-        meetings = {}
-        for row in (
-            MeetingRoles.objects.filter(
-                user__in=accounts,
-                context__state__in=(
-                    MeetingStateMachine.upcoming.value,
-                    MeetingStateMachine.ongoing.value,
-                ),
-            )
-            .order_by("context__title")
-            .values("user_id", "context_id", "context__title", "context__state")
-        ):
-            meetings.setdefault(row["user_id"], []).append(
-                {
-                    "pk": row["context_id"],
-                    "title": row["context__title"],
-                    "state": row["context__state"],
-                }
-            )
+        meetings = active_meetings_by_user(accounts)
         reason = why_not_mergeable(accounts, uid) if len(accounts) > 1 else None
         return Response(
             data={

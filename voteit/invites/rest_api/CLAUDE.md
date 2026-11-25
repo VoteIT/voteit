@@ -31,6 +31,12 @@ Input serializer: `InviteQuerySerializer` — accepts a list of `{scope, data, v
 For authenticated local users accepting/rejecting their own invites. Auth: `IsAuthenticated`.
 
 - `GET /` — list open invites matching the user's identity data from their ID-proxy `UserSocialAuth`.
+  `?include_used=1` adds invites to upcoming/ongoing meetings that another account accepted, serialized by
+  `MatchedInviteSerializer`: `used_elsewhere`, `switch_to` (that account's pk when it is active and shares the
+  user's `identity_id` — the `UserView.switch` rule) and `used_by_account`. With a switch, the account also has
+  `meetings` (first 5 upcoming/ongoing, `voteit.meeting.utils.active_meetings_by_user`) and `meeting_count`. Without a switch, each name part is
+  half masked (`mask_half`) and `user_data` keeps only the keys that matched.
+  On every row, `user_data` goes through the adapters' `mask()` (`get_masked_user_data`), as in WS messages.
 - `POST /{pk}/accept/` — accept; grants roles and applies group annotations.
 - `POST /{pk}/reject/` — reject.
 
