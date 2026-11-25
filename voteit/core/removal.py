@@ -41,6 +41,7 @@ from rq.job import Job
 
 from voteit.core import RQ_LONG_QUEUE
 from voteit.core.sessions import end_user_access
+from voteit.core.user_merger import MERGE_CID_PREFIX
 
 logger = getLogger(__name__)
 
@@ -448,7 +449,8 @@ def get_removal_reports(users) -> list[RemovalReport]:
         )
     )
     # Outlives whatever it's about, e.g. a deleted meeting. Entries on the
-    # user's own row and login methods go with the user anyway.
+    # user's own row and login methods go with the user anyway, and a merge's
+    # bookkeeping isn't anything the user did.
     user_meta, social_meta = get_user_model()._meta, UserSocialAuth._meta
     log_entries = dict(
         LogEntry.objects.filter(actor__in=user_pks)
@@ -461,6 +463,7 @@ def get_removal_reports(users) -> list[RemovalReport]:
             content_type__app_label=social_meta.app_label,
             content_type__model=social_meta.model_name,
         )
+        .exclude(cid__startswith=MERGE_CID_PREFIX)
         .values("actor_id")
         .annotate(count=Count("id"))
         .values_list("actor_id", "count")

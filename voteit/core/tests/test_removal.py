@@ -393,6 +393,20 @@ class RemovalReportTests(TestCase):
         self.assertEqual(NO_ACTIVITY, report.classification)
         self.assertEqual(0, report.log_entries)
 
+    def test_merged_account_isnt_a_log_trail(self):
+        from voteit.core.user_merger import UserMerger
+
+        org = self.meeting.organisation
+        user = org.users.create(username="kept", identity_id="same")
+        duplicate = org.users.create(username="duplicate", identity_id="same")
+        UserSocialAuth.objects.create(user=duplicate, provider="idproxy", uid="same")
+        UserMerger(duplicate, user, actor=user).run()
+        user.removal_requested = now()
+        user.save()
+        report = get_removal_report(user)
+        self.assertEqual(NO_ACTIVITY, report.classification)
+        self.assertEqual(0, report.log_entries)
+
     def test_editing_another_user_is_a_log_trail(self):
         user = self.meeting.organisation.users.create(
             username="former_manager", removal_requested=now()

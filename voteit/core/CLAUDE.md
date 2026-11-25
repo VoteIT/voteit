@@ -140,7 +140,8 @@ group titles, and counts of proposals, discussion posts, votes, speaker entries,
 ongoing polls the user can vote in, vote transfers (given or received) and reactions.
 Vote transfers and reactions cascade on delete, so they are there to keep such a user
 out of `no_activity`. `log_entries` counts the auditlog entries the user is actor of,
-except those on their own `User` row and on `UserSocialAuth` (both go with the user). It costs
+except those on their own `User` row and on `UserSocialAuth` (both go with the user), and
+those a merge wrote (correlation id starting with `MERGE_CID_PREFIX`). It costs
 13 queries for any number of users.
 
 A meeting is listed if any of these touch it, so content outlives removed roles.

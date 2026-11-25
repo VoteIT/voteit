@@ -20,6 +20,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+#: Starts the auditlog correlation id of every entry a merge writes.
+MERGE_CID_PREFIX = "user-merge-"
+
 _EXPLICITLY_HANDLED = frozenset(
     {
         ("meeting", "meetingroles", "user"),
@@ -193,7 +196,7 @@ class UserMerger:
         self.same_person = same_person
         self.actor = actor
         #: Correlation id on every auditlog entry of this merge.
-        self.cid = f"user-merge-{uuid4().hex}"
+        self.cid = f"{MERGE_CID_PREFIX}{uuid4().hex}"
         self.log = MergeLog()
         #: GroupMembership pks changed with update(), published after the merge.
         self._changed_memberships: set[int] = set()
