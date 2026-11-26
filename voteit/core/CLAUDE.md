@@ -275,7 +275,7 @@ Helper for ViewSets that need to look up a context object (e.g. a Meeting) from 
 
 ### Serializer mixins (`rest_api/serializers.py`)
 
-`BaseModelSerializer` validates `author` and `meeting_group` with meeting-scoped permission checks. `RichTextSerializerMixin` auto-extracts hashtags from body into `tags` and numeric `@mentions` into `mentions` (filtered to actual meeting participants).
+`BaseModelSerializer` validates `author` and `meeting_group` with meeting-scoped permission checks, both in `validate()`. `get_meeting(attrs)` finds the meeting from the instance, the context's `meeting`, or validated `agenda_item` / `meeting` — never from `initial_data`. `RichTextSerializerMixin` auto-extracts hashtags from body into `tags` and numeric `@mentions` into `mentions` (filtered to actual meeting participants).
 
 `PydanticFieldSerializer` bridges Pydantic models and DRF JSON fields — dumps inbound Pydantic instances, passthrough for plain dicts.
 

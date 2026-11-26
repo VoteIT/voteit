@@ -22,7 +22,6 @@ from voteit.core import NOT_ALLOWED_SM_GUARD
 from voteit.core import PERM
 from voteit.core.abcs import MeetingContext
 from voteit.core.removal import get_user_from_abort_token
-from voteit.core.rest_api.utils import meeting_from_unsafe_data
 from voteit.core.rest_api.validators import SMEventValidator
 from voteit.core.utils import get_tagged_hashtags
 from voteit.core.utils import get_tagged_userids
@@ -52,6 +51,28 @@ class BaseModelSerializer(serializers.ModelSerializer):
         if request is not None:
             return request.user
 
+    def get_meeting(self, attrs: Mapping | None = None) -> Meeting | None:
+        """
+        The meeting this serializer operates within, from trusted sources only:
+        the instance, the context, or validated attrs.
+        """
+        from voteit.meeting.models import Meeting
+
+        if self.instance is not None:
+            if isinstance(self.instance, MeetingContext):
+                return self.instance.meeting
+            return None
+        meeting = self.context.get("meeting")
+        if isinstance(meeting, Meeting):
+            return meeting
+        if attrs:
+            if agenda_item := attrs.get("agenda_item"):
+                return agenda_item.meeting
+            meeting = attrs.get("meeting")
+            if isinstance(meeting, Meeting):
+                return meeting
+        return None
+
     def validate(self, attrs):
         """
         Validation caveats here:
@@ -68,18 +89,8 @@ class BaseModelSerializer(serializers.ModelSerializer):
             do_validation = False
         if not isinstance(author, User) and author is not None:
             raise ValidationError(detail={self.author_kw: "Wrong type"})
+        meeting = self.get_meeting(attrs)
         if do_validation:
-            # First, find meeting
-            meeting = None
-            if self.instance:
-                if isinstance(self.instance, MeetingContext):
-                    meeting = self.instance.meeting
-            else:
-                try:
-                    meeting = meeting_from_unsafe_data(self)
-                except ValidationError:
-                    # Don't die here, there might be contexts outside meeting
-                    meeting = None
             if meeting:
                 user = self.get_request_user()
                 if (
@@ -103,43 +114,32 @@ class BaseModelSerializer(serializers.ModelSerializer):
                     }
                 )
         attrs[self.author_kw] = author
+        if attrs.get("meeting_group") is not None:
+            self._validate_meeting_group(attrs["meeting_group"], meeting)
         return attrs
 
-    def validate_meeting_group(self, value: MeetingGroup | None):
+    def _validate_meeting_group(
+        self, group: MeetingGroup, meeting: Meeting | None
+    ) -> None:
         """
-        - None is always allowed.
         - Moderators can post as any group.
         - Participants can post if they're members of that group.
         """
         from voteit.meeting.models import Meeting
-        from voteit.meeting.models import MeetingGroup
-
-        if value is None:
-            return value
 
         user = self.get_request_user()
         if user is None:
-            raise ValidationError(detail="Can't find posting user")
-        assert isinstance(value, MeetingGroup)  # A weird bug we won't catch
-        meeting = None
-        if self.instance:
-            # An operation on an existing object
-            if not isinstance(self.instance, MeetingContext):
-                raise ValidationError(detail="Not within a meeting")
-            meeting = self.instance.meeting
-        else:
-            # Tricky part, validate add. Die here if no meeting is found
-            meeting = meeting_from_unsafe_data(self)
-        assert isinstance(meeting, Meeting)  # Programming bug,not a user error
-        if not meeting.groups.filter(pk=value.pk).exists():
-            raise ValidationError(_("Meeting group doesn't exist"))
+            raise ValidationError({"meeting_group": "Can't find posting user"})
+        if meeting is None:
+            raise ValidationError({"meeting_group": "Not within a meeting"})
+        if group.meeting_id != meeting.pk:
+            raise ValidationError({"meeting_group": _("Meeting group doesn't exist")})
         if (
             user.has_perm(Meeting.get_perm(PERM.MODERATE), meeting)
-            or value.members.filter(pk=user.pk).exists()
+            or group.members.filter(pk=user.pk).exists()
         ):
-            return value
-        # Fail for anything else
-        raise ValidationError(_("You're not a member of this group"))
+            return
+        raise ValidationError({"meeting_group": _("You're not a member of this group")})
 
 
 class OptionalHyperlinkedIdentityField(serializers.HyperlinkedIdentityField):

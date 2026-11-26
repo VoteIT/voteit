@@ -88,12 +88,14 @@ class MeetingComponentSerializerTests(TestCase):
         self.assertIn("settings", serializer.errors)
 
     def test_enable_without_valid_settings(self):
+        self.flash_component.delete()
         component = self.meeting.components.create(component_name=FlashMessage.name)
         serializer = self._cut(component, data={"enabled": True}, partial=True)
         serializer.is_valid()
         self.assertIn("enabled", serializer.errors)
 
     def test_enable_with_settings_in_same_request(self):
+        self.flash_component.delete()
         component = self.meeting.components.create(component_name=FlashMessage.name)
         serializer = self._cut(
             component, data={"enabled": True, "settings": {"msg": "Hi"}}, partial=True

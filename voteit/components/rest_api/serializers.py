@@ -7,7 +7,6 @@ from voteit.components.models import MeetingComponent
 from voteit.components.models import OrganisationComponent
 from voteit.components.utils import get_meeting_component_adapters
 from voteit.core.rest_api.serializers import PydanticFieldSerializer
-from voteit.core.rest_api.utils import meeting_from_unsafe_data
 from voteit.core.rest_api.utils import validate_model_add
 from voteit.meeting.models import Meeting
 
@@ -45,17 +44,29 @@ class ComponentSerializer(serializers.ModelSerializer):
 class CreateMeetingComponentSerializer(ComponentSerializer):
     class Meta(ComponentSerializer.Meta):
         model = MeetingComponent
+        # The generated UniqueTogetherValidator would report a duplicate as a
+        # non-field error. validate() keeps it under component_name.
+        validators = []
 
     def validate_component_name(self, value: str):
         registry = get_meeting_component_adapters()
         if value not in registry:
             raise ValidationError("No such component name")
-        meeting = meeting_from_unsafe_data(self)
-        if meeting.components.filter(component_name=value).exists():
-            raise ValidationError(
-                "Only one of these components are allowed per meeting."
-            )
         return value
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        if self.instance is None and (
+            attrs["meeting"]
+            .components.filter(component_name=attrs["component_name"])
+            .exists()
+        ):
+            raise ValidationError(
+                {
+                    "component_name": "Only one of these components are allowed per meeting."
+                }
+            )
+        return attrs
 
     def validate_meeting(self, value: Meeting):
         validate_model_add(self, MeetingComponent, value)

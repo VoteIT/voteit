@@ -6,7 +6,6 @@ from typing import Any
 from typing import TYPE_CHECKING
 from typing import TypeVar
 
-from django.core.exceptions import ObjectDoesNotExist
 from django.utils.translation import gettext as _
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
@@ -17,7 +16,6 @@ from voteit.core import PERM
 
 if TYPE_CHECKING:
     from pydantic import ValidationError as PydanticValidationError
-    from voteit.meeting.models import Meeting
 
 T = TypeVar("T", bound=RulesModelMixin)
 
@@ -34,82 +32,6 @@ def validate_model_add(serializer, model: T | type[T], context: Any = None) -> N
     model_perm = model.get_perm(PERM.ADD)
     if not user.has_perm(model_perm, context):
         raise PermissionDenied(perm_denied_msg(model_perm, context))
-
-
-def _pos_int_or_validation_error(value) -> int:
-    """
-    >>> _pos_int_or_validation_error("1")
-    1
-    >>> _pos_int_or_validation_error("0")
-    Traceback (most recent call last):
-    ...
-    rest_framework.exceptions.ValidationError:
-    >>> _pos_int_or_validation_error("-1")
-    Traceback (most recent call last):
-    ...
-    rest_framework.exceptions.ValidationError:
-    >>> _pos_int_or_validation_error("a")
-    Traceback (most recent call last):
-    ...
-    rest_framework.exceptions.ValidationError:
-    """
-    try:
-        value = int(value)
-    except (ValueError, TypeError):
-        raise ValidationError("Invalid")
-    if value > 0:
-        return value
-    raise ValidationError("Invalid")
-
-
-def meeting_from_unsafe_data(serializer) -> Meeting:
-    """
-    This method should only be used directly by a serializer validation method
-
-    >>> from rest_framework.serializers import Serializer
-    >>> from voteit.meeting.models import Meeting
-    >>> m = Meeting()
-    >>> serializer = Serializer(data={}, context={'meeting': m})
-    >>> m is meeting_from_unsafe_data(serializer)
-    True
-    """
-    # Via context is a lot better
-    from voteit.meeting.models import Meeting
-
-    _meeting = serializer.context.get("meeting")
-    if isinstance(_meeting, Meeting):
-        return _meeting
-
-    # Via agenda_item
-    many = serializer.initial_data and isinstance(serializer.initial_data, list)
-    if many:
-        # Just make one attempt here
-        ai_query_val = serializer.initial_data[0].get("agenda_item", None)
-    else:
-        ai_query_val = serializer.initial_data.get("agenda_item", None)
-    if ai_query_val:
-        ai_query_val = _pos_int_or_validation_error(ai_query_val)
-        from voteit.agenda.models import AgendaItem
-
-        try:
-            ai = AgendaItem.objects.get(pk=ai_query_val)
-            if ai.meeting:
-                return ai.meeting
-        except ObjectDoesNotExist:
-            pass
-    # Via meeting
-    if many:
-        meeting_query_val = serializer.initial_data[0].get("meeting", None)
-    else:
-        meeting_query_val = serializer.initial_data.get("meeting", None)
-    if meeting_query_val:
-        meeting_query_val = _pos_int_or_validation_error(meeting_query_val)
-        try:
-            return Meeting.objects.get(pk=meeting_query_val)
-        except ObjectDoesNotExist:
-            pass
-    # Fail
-    raise ValidationError(_("Can't find meeting"))
 
 
 def _nested_set(container, path, value):

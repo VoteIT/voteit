@@ -19,5 +19,4 @@ class FlashMessage(ComponentAdapter):
 
     name = "flash_message"
     title = "Flash message"
-    multiple = True
     schema = MessageSchema

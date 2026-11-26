@@ -88,7 +88,7 @@ Registered at `meeting-components/`. Only `MeetingComponent` has a dedicated Vie
 | `partial_update` | PATCH | `meeting-components/{pk}/` | `MeetingComponentSerializer` | Requires `meeting_not_archived & is_moderator`; `component_name` and `meeting` are read-only |
 | `destroy` | DELETE | `meeting-components/{pk}/` | — | Requires `meeting_not_archived & is_moderator` |
 
-`create` uses `CreateMeetingComponentSerializer` which enforces: name must be in the registry, and only one instance of each `component_name` is allowed per meeting.
+`create` uses `CreateMeetingComponentSerializer` which enforces: name must be in the registry, and only one instance of each `component_name` is allowed per meeting (also a DB constraint).
 
 `permission_type_map` overrides `create` and `retrieve` to `None` — those actions skip the automatic permission lookup and rely on serializer-level and queryset-level access control instead.
 
@@ -137,7 +137,7 @@ No permissions are defined for `OrganisationComponent` — management happens ou
 
 **Enabling with settings in the same request is allowed.** The `ComponentSerializer.validate()` cross-field check skips the existing-settings check if `settings` is also in the incoming `attrs`, allowing a single PATCH to set settings and flip `enabled = True` atomically.
 
-**Only one instance per component name per meeting.** `CreateMeetingComponentSerializer.validate_component_name` enforces this. There is a `multiple` attribute on some adapters (`FlashMessage.multiple = True`) but it is not yet enforced by the system — noted as "Not implemented yet" in `ComponentAdapter`.
+**Only one instance per component name per meeting.** Enforced by the `unique_meeting_component_name` constraint. `CreateMeetingComponentSerializer.validate()` checks it first so the error lands under `component_name`; its `Meta.validators = []` drops DRF's generated validator, which would report it as a non-field error.
 
 ## Tests
 

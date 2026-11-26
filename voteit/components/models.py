@@ -41,6 +41,12 @@ class MeetingComponent(Component, MeetingContext):
     class Meta:
         verbose_name = "Meeting component"
         verbose_name_plural = "Meeting components"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["meeting", "component_name"],
+                name="unique_meeting_component_name",
+            ),
+        ]
 
     def get_registry(self) -> Registry[str, ComponentAdapter]:
         return get_meeting_component_adapters()

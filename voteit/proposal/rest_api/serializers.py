@@ -11,7 +11,6 @@ from voteit.agenda.models import AgendaItem
 from voteit.core.rest_api.serializers import BaseModelSerializer
 from voteit.core.rest_api.serializers import ExportBaseSerializerMixin
 from voteit.core.rest_api.serializers import RichTextSerializerMixin
-from voteit.core.rest_api.utils import meeting_from_unsafe_data
 from voteit.core.rest_api.utils import validate_model_add
 from voteit.core.rest_api.validators import ValidateGroupAIContext
 from voteit.core.utils import get_model_shortname
@@ -134,7 +133,7 @@ class ProposalCreateSerializer(RichTextSerializerMixin, BaseModelSerializer):
         # FIXME Proposal id method should be used instead
         with suppress(AttributeError):
             return instance.prop_id
-        meeting = meeting_from_unsafe_data(self)
+        meeting = instance["agenda_item"].meeting
         if suggestion := meeting.pid_policy.suggestion(
             author=instance.get("author"),
             meeting_group=instance.get("meeting_group"),
