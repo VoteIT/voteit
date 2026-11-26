@@ -37,12 +37,14 @@ class FixtureMixin:
         )
         # Groups
         cls.the_voters_group: MeetingGroup = cls.meeting.groups.create(
-            groupid="the_voters"
+            groupid="the_voters", title="the_voters"
         )
         cls.the_other_voters_group: MeetingGroup = cls.meeting.groups.create(
-            groupid="the_other_voters"
+            groupid="the_other_voters", title="the_other_voters"
         )
-        cls.the_board: MeetingGroup = cls.meeting.groups.create(groupid="board")
+        cls.the_board: MeetingGroup = cls.meeting.groups.create(
+            groupid="board", title="board"
+        )
         # Users
         cls.president = User.objects.create(username="president")
         cls.main1 = User.objects.create(username="one")

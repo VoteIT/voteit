@@ -457,6 +457,19 @@ class CloneViewTests(APITestCase):
         self.assertIsNone(cache.get(import_lock._processing_key(self.session_key)))
         self.assertIsNotNone(cache.get(import_lock._cooldown_key(self.session_key)))
 
+    def test_clone_group_title_clash_rejected(self):
+        self.meeting.groups.create(title="Board", groupid="board")
+        self.target_meeting.groups.create(title="board", groupid="styrelse")
+        url = reverse("meeting-data-clone", kwargs={"pk": self.target_meeting.pk})
+        for preview in (True, False):
+            response = self.client.post(
+                url,
+                data={"source": self.meeting.pk, "preview": preview},
+                format="json",
+            )
+            self.assertEqual(status.HTTP_400_BAD_REQUEST, response.status_code)
+            self.assertIn("Title(s) already used", str(response.json()))
+
     def test_clone_target_not_upcoming_rejected(self):
         url = reverse("meeting-data-clone", kwargs={"pk": self.ongoing_meeting.pk})
         response = self.client.post(

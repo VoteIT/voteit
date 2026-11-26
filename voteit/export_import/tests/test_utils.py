@@ -89,7 +89,9 @@ class UtilsTests(TestCase):
 
     def test_direct_clone_group_with_delegate_to(self):
         the_hellos = self.meeting.groups.get(groupid="the-hellos")
-        self.meeting.groups.create(title="Delegating group", delegate_to=the_hellos)
+        self.meeting.groups.create(
+            title="Delegating group", delegate_to=the_hellos, groupid="delegating-group"
+        )
         importer = direct_clone(
             source=self.meeting,
             target=self.new_meeting,

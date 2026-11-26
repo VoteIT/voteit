@@ -34,8 +34,8 @@ class ImportInvitesCommandTests(TestCase):
     def test_roles_from_file(self):
         # grouprole.csv has email\tgroup\tgrouprole columns — roles default to PARTICIPANT
         meeting = self.meeting
-        meeting.groups.create(groupid="sw")
-        meeting.groups.create(groupid="sabreclub")
+        meeting.groups.create(groupid="sw", title="sw")
+        meeting.groups.create(groupid="sabreclub", title="sabreclub")
         meeting.group_roles.create(role_id="jedi")
         meeting.group_roles.create(role_id="sith")
         self.call_command(m=meeting.pk, f=fixture_file("grouprole.csv"))
@@ -45,8 +45,8 @@ class ImportInvitesCommandTests(TestCase):
 
     def test_annotation_applied(self):
         meeting = self.meeting
-        group_sw = meeting.groups.create(groupid="sw")
-        meeting.groups.create(groupid="sabreclub")
+        group_sw = meeting.groups.create(groupid="sw", title="sw")
+        meeting.groups.create(groupid="sabreclub", title="sabreclub")
         meeting.group_roles.create(role_id="jedi")
         meeting.group_roles.create(role_id="sith")
         self.call_command(m=meeting.pk, f=fixture_file("grouprole.csv"))
@@ -61,8 +61,8 @@ class ImportInvitesCommandTests(TestCase):
         written, so one of the combinations would silently be discarded.
         """
         meeting = self.meeting
-        meeting.groups.create(groupid="sw")
-        meeting.groups.create(groupid="sabreclub")
+        meeting.groups.create(groupid="sw", title="sw")
+        meeting.groups.create(groupid="sabreclub", title="sabreclub")
         with self.assertRaises(CommandError) as cm:
             self.call_command(m=meeting.pk, f=fixture_file("conflicting_roles.csv"))
         self.assertIn("different roles", str(cm.exception))
@@ -103,8 +103,8 @@ class ImportInvitesCommandTests(TestCase):
 
     def test_annotation_dryrun_does_not_save(self):
         meeting = self.meeting
-        meeting.groups.create(groupid="sw")
-        meeting.groups.create(groupid="sabreclub")
+        meeting.groups.create(groupid="sw", title="sw")
+        meeting.groups.create(groupid="sabreclub", title="sabreclub")
         meeting.group_roles.create(role_id="jedi")
         meeting.group_roles.create(role_id="sith")
         self.call_command(m=meeting.pk, f=fixture_file("grouprole.csv"), dryrun=True)

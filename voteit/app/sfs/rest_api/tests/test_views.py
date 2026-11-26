@@ -28,7 +28,7 @@ class SetDelegationVotersViewSetTests(APITestCase):
             roles=[ROLE_POTENTIAL_VOTER],
         )
         cls.doctor_hats: MeetingGroup = cls.meeting.groups.create(
-            groupid="doctor_hats", votes=4
+            groupid="doctor_hats", votes=4, title="doctor_hats"
         )
         cls.moderator = User.objects.create(username="moderator")
         cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR, ROLE_POTENTIAL_VOTER)

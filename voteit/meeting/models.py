@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Generator
 from auditlog.registry import auditlog
 from django.conf import settings
 from django.db import models
+from django.db.models.functions import Lower
 from django.utils.functional import cached_property
 from django.utils.text import slugify
 from rules.contrib.models import RulesModelMixin
@@ -424,12 +425,14 @@ class MeetingGroup(BaseContent, MeetingContext):
     share of the group's total; adjustments to ``MeetingGroup.votes`` may zero out
     individual allocations that exceed the new total.
 
-    ``groupid`` is a URL-safe slug auto-generated from the title on first save.
+    ``groupid`` identifies the group to machines (imports, invites, dialects) and
+    ``title`` to people, case-insensitively. Both are unique per meeting. Input
+    layers generate a missing groupid via ``voteit.meeting.utils.suggest_groupid``.
     """
 
     name: str = "meeting_group"
-    title: str = models.CharField(max_length=100, default="")
-    groupid: str = models.CharField(max_length=100, null=True, blank=True)
+    title: str = models.CharField(max_length=100)
+    groupid: str = models.CharField(max_length=100)
     meeting: Meeting = models.ForeignKey(
         "Meeting",
         on_delete=models.CASCADE,
@@ -460,28 +463,16 @@ class MeetingGroup(BaseContent, MeetingContext):
         default=False,
     )
 
-    def save(self, **kwargs):
-        if not self.groupid:
-            existing_groupids = set(
-                self.meeting.groups.all().values_list("groupid", flat=True)
-            )
-            _max = self._meta.get_field("groupid").max_length
-            base = (slugify(self.title) or _rnd_role_id())[:_max]
-            groupid = base
-            for i in range(1, 6):
-                if groupid not in existing_groupids:
-                    break
-                suffix = f"-{i}"
-                groupid = base[: _max - len(suffix)] + suffix
-            self.groupid = groupid
-        if not self.title:
-            self.title = self.groupid
-        super().save(**kwargs)
-
     class Meta:
         constraints = (
             models.UniqueConstraint(
                 fields=("groupid", "meeting"), name="unique_meeting_id"
+            ),
+            models.UniqueConstraint(
+                Lower("title"),
+                "meeting",
+                name="unique_meeting_group_title_ci",
+                violation_error_message="A group with that title already exists.",
             ),
             models.CheckConstraint(
                 name="prevent_delegate_to_self",

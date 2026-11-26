@@ -18,6 +18,8 @@ Join table between `User` and `Meeting`. The `assigned` field (`RolesField`, Pos
 ### MeetingGroup
 A named group within a meeting (e.g. delegation). `votes` is the group's total voting power. `delegate_to` delegates that power to another group (self-delegation and circular chains are blocked by serializer validation). Changing `votes` on a group may zero out individual `GroupMembership.votes` if they exceed the new total (enforced by `adjust_membership_voting_power_when_group_changes` signal).
 
+Identity: `groupid` (unique per meeting) is what imports, invites and dialects match on; `title` is unique per meeting **case-insensitively** (`unique_meeting_group_title_ci`, a functional constraint on `Lower("title")`). The model does no generation — input layers do: REST create and bulk-create fill a missing groupid via `utils.suggest_groupid`, and every path that adds groups (REST, bulk-create, import/clone, dialect install) rejects a title already used by a group with another groupid. Groupid format (`slugify`) is only enforced on input; legacy non-slug ids like `AB` exist and stay valid when unchanged.
+
 ### GroupMembership
 Through-model for `MeetingGroup.members` (M2M). Holds `role` (FK to `GroupRole`, nullable) and `votes` (the member's allocated share of the group's voting power). Saving/deleting this fires `group_role_added` / `group_role_removed` signals, which cascade into adding/removing meeting-level roles from `MeetingRoles`.
 

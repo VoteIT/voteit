@@ -169,6 +169,8 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
             )
         except PydanticValidationError as exc:
             raise pydantic_to_drf_validation_error(exc)
+        except ImportFileError as exc:
+            raise ValidationError(str(exc))
         finally:
             lock.release(request)
 

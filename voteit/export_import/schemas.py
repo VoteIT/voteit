@@ -497,12 +497,15 @@ class MeetingGroupData(BaseContentData):
     def clean_group_body(cls, v):
         return strict_clean_html(v) if isinstance(v, str) else v
 
-    @field_validator("title")
-    @classmethod
-    def use_groupid_as_title_if_empty(cls, v, info: ValidationInfo):
-        if not v:
-            v = info.data["groupid"]
-        return v
+    @model_validator(mode="after")
+    def use_groupid_as_title_if_empty(self):
+        """
+        >>> MeetingGroupData(groupid='board').title
+        'board'
+        """
+        if not self.title:
+            self.title = self.groupid
+        return self
 
     @field_validator("members", mode="before")
     @classmethod
@@ -740,6 +743,28 @@ class MeetingStructure(BaseModel):
             used.add(mgd.groupid)
         if duplicate:
             raise ValueError("Duplicate groupid(s): '%s'" % "', '".join(duplicate))
+        return v
+
+    @field_validator("groups")
+    @classmethod
+    def check_unique_titles(cls, v: list[MeetingGroupData]):
+        """
+        >>> f = MeetingStructure.check_unique_titles
+        >>> d = MeetingGroupData
+        >>> _ = f([d(groupid='a', title='Hello'), d(groupid='b', title='World')])
+        >>> f([d(groupid='a', title='Same'), d(groupid='b', title='SAME')])
+        Traceback (most recent call last):
+        ...
+        ValueError: Duplicate group title(s): 'SAME'
+        """
+        used = set()
+        duplicate = []
+        for mgd in v:
+            if mgd.title.lower() in used:
+                duplicate.append(mgd.title)
+            used.add(mgd.title.lower())
+        if duplicate:
+            raise ValueError("Duplicate group title(s): '%s'" % "', '".join(duplicate))
         return v
 
     @field_validator("agenda_items")

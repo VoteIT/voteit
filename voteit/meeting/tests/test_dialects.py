@@ -160,6 +160,15 @@ class DialectHandlerTests(TestCase):
         self.assertEqual([ROLE_DISCUSSER, ROLE_PROPOSER], group_role.roles)
         self.assertEqual("Board", group.title)
 
+    def test_install_title_used_by_other_group(self):
+        self.meeting.groups.create(title="BOARD", groupid="the-board")
+        handler = self._cut.load_from_dict(dialect_named_test)
+        with self.assertRaises(DialectError) as cm:
+            handler.install(self.meeting)
+        self.assertIn("'Board'", str(cm.exception))
+        self.meeting.refresh_from_db()
+        self.assertIsNone(self.meeting.installed_dialect)
+
     def test_install_with_script(self):
         handler = self._cut.load_from_dict(dialect_named_test)
         handler.data.run_scripts.append(

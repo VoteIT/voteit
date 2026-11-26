@@ -178,6 +178,7 @@ class ExporterTests(TestCase):
             meeting=self.meeting,
             title="Delegating group",
             delegate_to=the_hellos,
+            groupid="delegating-group",
         )
         exporter = self._cut(self.meeting)
         exporter()

@@ -341,6 +341,72 @@ class MeetingGroupRelatedSerializersTests(TestCase):
         serializer.save()
         self.assertEqual("new_id", self.plebei_hangout.groupid)
 
+    def test_create_meeting_group_generates_groupid(self):
+        serializer = CreateMeetingGroupSerializer(
+            data={"title": "The Hangout 2", "meeting": self.meeting.pk},
+            context={"request": self._mk_request(self.moderator)},
+        )
+        serializer.is_valid(raise_exception=True)
+        self.assertEqual("the-hangout-2", serializer.save().groupid)
+
+    def test_create_meeting_group_generated_groupid_avoids_taken(self):
+        self.meeting.groups.create(title="Something else", groupid="new")
+        serializer = CreateMeetingGroupSerializer(
+            data={"title": "New", "groupid": "", "meeting": self.meeting.pk},
+            context={"request": self._mk_request(self.moderator)},
+        )
+        serializer.is_valid(raise_exception=True)
+        self.assertEqual("new-1", serializer.save().groupid)
+
+    def test_create_meeting_group_requires_title(self):
+        serializer = CreateMeetingGroupSerializer(
+            data={"groupid": "new", "meeting": self.meeting.pk},
+            context={"request": self._mk_request(self.moderator)},
+        )
+        serializer.is_valid()
+        self.assertIn("title", serializer.errors)
+
+    def test_create_meeting_group_existing_title(self):
+        serializer = CreateMeetingGroupSerializer(
+            data={"title": "THE HANGOUT", "meeting": self.meeting.pk},
+            context={"request": self._mk_request(self.moderator)},
+        )
+        serializer.is_valid()
+        self.assertIn("title", serializer.errors)
+
+    def test_patch_meeting_group_title_of_other_group(self):
+        serializer = MeetingGroupSerializer(
+            self.plebei_hangout, data={"title": "moderator CLUB"}, partial=True
+        )
+        serializer.is_valid()
+        self.assertIn("title", serializer.errors)
+
+    def test_patch_meeting_group_own_title_other_case(self):
+        serializer = MeetingGroupSerializer(
+            self.plebei_hangout, data={"title": "THE HANGOUT"}, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        self.assertEqual("plebei", self.plebei_hangout.groupid)
+
+    def test_patch_meeting_group_keeps_legacy_groupid(self):
+        legacy = self.meeting.groups.create(title="Legacy", groupid="AB")
+        serializer = MeetingGroupSerializer(
+            legacy, data={"title": "Legacy!", "groupid": "AB"}, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        self.assertEqual("AB", legacy.groupid)
+
+    def test_patch_meeting_group_blank_groupid_keeps_existing(self):
+        serializer = MeetingGroupSerializer(
+            self.plebei_hangout, data={"groupid": ""}, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        self.plebei_hangout.refresh_from_db()
+        self.assertEqual("plebei", self.plebei_hangout.groupid)
+
     def test_create_meeting_group_existing_groupid(self):
         serializer = CreateMeetingGroupSerializer(
             data={

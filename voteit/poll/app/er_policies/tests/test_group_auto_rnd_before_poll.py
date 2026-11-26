@@ -29,8 +29,12 @@ class GroupAutoRandomBeforePollTests(TestCase):
         cls.user2 = User.objects.create(username="two")
         cls.meeting.add_roles(cls.user1, ROLE_POTENTIAL_VOTER)
         cls.meeting.add_roles(cls.user2, ROLE_POTENTIAL_VOTER)
-        cls.group_l: MeetingGroup = cls.meeting.groups.create(title="Large", votes=10)
-        cls.group_s: MeetingGroup = cls.meeting.groups.create(title="Small", votes=1)
+        cls.group_l: MeetingGroup = cls.meeting.groups.create(
+            title="Large", votes=10, groupid="large"
+        )
+        cls.group_s: MeetingGroup = cls.meeting.groups.create(
+            title="Small", votes=1, groupid="small"
+        )
         cls.group_l.members.add(cls.user1, cls.user2)
         cls.group_s.members.add(cls.user1)
         cls.poll = Poll.objects.create(meeting=cls.meeting, method_name="simple")

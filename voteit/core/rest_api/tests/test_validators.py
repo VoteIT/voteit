@@ -18,7 +18,7 @@ class ValidateGroupAIContextTests(TestCase):
         cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
-        cls.group = cls.meeting.groups.create(title="Our gang")
+        cls.group = cls.meeting.groups.create(title="Our gang", groupid="our-gang")
         cls.user = cls.meeting.participants.create(username="jane")
         cls.moderator = cls.meeting.participants.create(username="moderator")
         cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
@@ -26,7 +26,9 @@ class ValidateGroupAIContextTests(TestCase):
         cls.ai = cls.meeting.agenda_items.create(state="ongoing", title="Ongoing")
         # Outside of test meeting
         cls.other_meeting: Meeting = Meeting.objects.create(title="Other meeting")
-        cls.other_group = cls.other_meeting.groups.create(title="Other")
+        cls.other_group = cls.other_meeting.groups.create(
+            title="Other", groupid="other"
+        )
 
     @property
     def _cut(self):

@@ -110,7 +110,10 @@ Note: `include_reactions` defaults to `False` (opt-in). All others default to `T
 `clear_authors`, `clear_group_authors`, `clear_ai_states`, `clear_proposal_states`, `clear_proposal_id`
 
 **Import behaviour:**
-`use_existing_groups` (update_or_create by groupid), `add_participants` (auto-add imported users as participants), `preview` (parse/validate only, don't write — see "preview flag" above)
+`use_existing_groups` (update_or_create by groupid; when off, an existing groupid is an error), `add_participants` (auto-add imported users as participants), `preview` (parse/validate only, don't write — see "preview flag" above)
+
+### Group conflicts
+`Importer.prep_data()` ends with `check_group_conflicts()`, which raises `ImportFileError` for an existing groupid while `use_existing_groups` is off, or a title held by another group (case-insensitive). Running in `prep_data` means preview and clone preview report it too. Groups are never matched by title.
 
 ## MissingUser strategies
 

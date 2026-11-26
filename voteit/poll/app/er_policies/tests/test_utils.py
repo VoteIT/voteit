@@ -32,8 +32,12 @@ class CalcGroupVotesEqualTests(TestCase):
         cls.meeting.add_roles(cls.one, ROLE_POTENTIAL_VOTER)
         cls.meeting.add_roles(cls.two, ROLE_POTENTIAL_VOTER)
         cls.meeting.add_roles(cls.three, ROLE_POTENTIAL_VOTER)
-        cls.group_one: MeetingGroup = cls.meeting.groups.create(groupid="one")
-        cls.group_two: MeetingGroup = cls.meeting.groups.create(groupid="two")
+        cls.group_one: MeetingGroup = cls.meeting.groups.create(
+            groupid="one", title="one"
+        )
+        cls.group_two: MeetingGroup = cls.meeting.groups.create(
+            groupid="two", title="two"
+        )
         cls.group_one.members.add(cls.one, cls.two, cls.three)
         cls.group_two.members.add(cls.one, cls.two, cls.three)
 

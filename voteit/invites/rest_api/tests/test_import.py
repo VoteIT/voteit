@@ -377,8 +377,10 @@ class ImportFileFormatTests(APITestCase):
         cls.meeting: Meeting = cls.org.meetings.create()
         cls.moderator = cls.org.users.create(username="mod", email="mod@example.com")
         cls.meeting.add_roles(cls.moderator, "mo", "pa")
-        cls.group_sw = cls.meeting.groups.create(groupid="sw")
-        cls.group_sabreclub = cls.meeting.groups.create(groupid="sabreclub")
+        cls.group_sw = cls.meeting.groups.create(groupid="sw", title="sw")
+        cls.group_sabreclub = cls.meeting.groups.create(
+            groupid="sabreclub", title="sabreclub"
+        )
 
     def setUp(self):
         self.client.force_login(self.moderator)
@@ -523,7 +525,7 @@ class ImportRolesWithEmptyRowsTests(APITestCase):
         cls.meeting: Meeting = cls.org.meetings.create()
         cls.moderator = cls.org.users.create(username="mod", email="mod@x.com")
         cls.meeting.add_roles(cls.moderator, "mo", "pa")
-        cls.group_sw = cls.meeting.groups.create(groupid="sw")
+        cls.group_sw = cls.meeting.groups.create(groupid="sw", title="sw")
 
     def setUp(self):
         self.client.force_login(self.moderator)
@@ -592,7 +594,7 @@ class ImportInvitesFunctionalTests(APITestCase):
         cls.meeting: Meeting = cls.org.meetings.create()
         cls.moderator = cls.org.users.create(username="mod", email="mod@x.com")
         cls.meeting.add_roles(cls.moderator, "mo", "pa")
-        cls.group_board = cls.meeting.groups.create(groupid="board")
+        cls.group_board = cls.meeting.groups.create(groupid="board", title="board")
         cls.role_chair = cls.meeting.group_roles.create(role_id="chair")
 
     def setUp(self):
@@ -704,7 +706,7 @@ class ImportInvitesFunctionalTests(APITestCase):
         Only the user_data part reaches create_or_update_mixed, so the manager
         sees the same dict twice and must collapse it into one invite.
         """
-        self.meeting.groups.create(groupid="staff")
+        self.meeting.groups.create(groupid="staff", title="staff")
         self.meeting.group_roles.create(role_id="member")
         response = self._post(
             "email\tgroup\tgrouprole\n"
@@ -741,7 +743,7 @@ class ImportInvitesFunctionalTests(APITestCase):
         same recipient with conflicting roles would silently end up with
         whichever combination happens to be processed last. Reject instead.
         """
-        self.meeting.groups.create(groupid="staff")
+        self.meeting.groups.create(groupid="staff", title="staff")
         response = self._post(
             "email,roles,group\nalice@example.com,mo,board\nalice@example.com,,staff\n"
         )
@@ -753,7 +755,7 @@ class ImportInvitesFunctionalTests(APITestCase):
 
     def test_same_email_on_two_rows_with_same_roles_is_accepted(self):
         """Repeating the roles column on every row of the same person is fine."""
-        self.meeting.groups.create(groupid="staff")
+        self.meeting.groups.create(groupid="staff", title="staff")
         response = self._post(
             "email,roles,group\nalice@example.com,mo,board\nalice@example.com,mo,staff\n"
         )
@@ -800,7 +802,7 @@ class ImportInvitesFunctionalTests(APITestCase):
     def test_same_email_two_groups_with_different_grouproles(self):
         """Different groups are different records -- no conflict."""
         self.meeting.group_roles.create(role_id="member")
-        staff = self.meeting.groups.create(groupid="staff")
+        staff = self.meeting.groups.create(groupid="staff", title="staff")
         response = self._post(
             "email\tgroup\tgrouprole\n"
             "alice@example.com\tboard\tchair\n"
@@ -878,7 +880,7 @@ class ImportInvitesBadFileTests(APITestCase):
         cls.moderator = cls.org.users.create(username="mod", email="mod@x.com")
         cls.meeting.add_roles(cls.moderator, "mo", "pa")
         # Groups referenced in the semicolon fixture file
-        cls.meeting.groups.create(groupid="sw")
+        cls.meeting.groups.create(groupid="sw", title="sw")
 
     def setUp(self):
         self.client.force_login(self.moderator)

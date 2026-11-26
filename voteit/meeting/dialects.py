@@ -24,6 +24,8 @@ from voteit.components.app.components.dialects import DialectsFilter
 from voteit.components.utils import get_meeting_component_adapters
 from voteit.core.decorators import ensure_atomic
 from voteit.meeting.exceptions import DialectError
+from voteit.meeting.utils import existing_group_identity
+from voteit.meeting.utils import find_group_title_clashes
 from voteit.meeting.models import Meeting
 from voteit.meeting.schemas import DialectSchema
 from voteit.meeting.statemachines import MeetingStateMachine
@@ -206,6 +208,15 @@ class DialectHandler:
         # Basics
         if meeting.installed_dialect:
             raise DialectError("Meeting already has an installed dialect")
+        if self.data.groups:
+            _, title_map = existing_group_identity(meeting)
+            if clashes := find_group_title_clashes(
+                title_map, [(g.groupid, g.title or g.groupid) for g in self.data.groups]
+            ):
+                raise DialectError(
+                    "Group title(s) already used by other groups: '%s'"
+                    % "', '".join(clashes)
+                )
         meeting.installed_dialect = self.data.name
         # Optionals
         for k in chain(self.optional_nullable, self.optional_default_false):
@@ -254,9 +265,11 @@ class DialectHandler:
         for g_data in self.data.groups:
             group = meeting.groups.filter(groupid=g_data.groupid).first()
             if group is None:
-                meeting.groups.create(**g_data.model_dump())
+                meeting.groups.create(
+                    groupid=g_data.groupid, title=g_data.title or g_data.groupid
+                )
             else:
-                for k, v in g_data.dict(exclude={"groupid"}).items():
+                for k, v in g_data.dict(exclude={"groupid"}, exclude_none=True).items():
                     if getattr(group, k, object()) != v:
                         setattr(group, k, v)
                 group.save()

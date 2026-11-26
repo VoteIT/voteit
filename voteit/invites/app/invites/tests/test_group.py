@@ -40,8 +40,10 @@ class GroupAnnotationTests(TestCase):
             user_data={"email": "hello@world.com"}
         )
         # Groups
-        cls.group_sabreclub = cls.meeting.groups.create(groupid="sabreclub")
-        cls.group_sw = cls.meeting.groups.create(groupid="sw")
+        cls.group_sabreclub = cls.meeting.groups.create(
+            groupid="sabreclub", title="sabreclub"
+        )
+        cls.group_sw = cls.meeting.groups.create(groupid="sw", title="sw")
         cls.role_sith = cls.meeting.group_roles.create(role_id="sith")
         cls.role_jedi = cls.meeting.group_roles.create(role_id="jedi")
 

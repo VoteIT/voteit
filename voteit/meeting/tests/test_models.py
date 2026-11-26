@@ -1,5 +1,7 @@
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError
+from django.db import transaction
 from django.test import TestCase
 from rest_framework.exceptions import ValidationError
 
@@ -175,17 +177,27 @@ class MeetingGroupTests(TestCase):
 
         return MeetingGroup
 
-    def test_unique_in_group(self):
-        group1 = self.meetings[0].groups.create(title="King's College")
-        group2 = self.meetings[1].groups.create(title="King's College")
-        group3 = self.meetings[0].groups.create(title="King's Cóllege")
-        self.assertEqual(group1.groupid, "kings-college")
-        self.assertEqual(group2.groupid, "kings-college")
-        self.assertEqual(group3.groupid, "kings-college-1")
+    def test_groupid_unique_in_meeting(self):
+        self.meetings[0].groups.create(title="One", groupid="kings-college")
+        self.meetings[1].groups.create(title="One", groupid="kings-college")
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            self.meetings[0].groups.create(title="Two", groupid="kings-college")
+
+    def test_title_unique_in_meeting_case_insensitive(self):
+        self.meetings[0].groups.create(title="King's College", groupid="a")
+        self.meetings[1].groups.create(title="King's College", groupid="a")
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            self.meetings[0].groups.create(title="KING'S college", groupid="b")
+
+    def test_title_unique_validates_in_full_clean(self):
+        self.meetings[0].groups.create(title="Board", groupid="a")
+        group = self.MeetingGroup(meeting=self.meetings[0], title="board", groupid="b")
+        with self.assertRaises(DjangoValidationError):
+            group.full_clean()
 
     def test_max_votes_and_membership(self):
         meeting = self.meetings[0]
-        group = meeting.groups.create(title="Voters", votes=3)
+        group = meeting.groups.create(title="Voters", votes=3, groupid="voters")
         voter_one = self.organisation.users.create(username="one")
         voter_two = self.organisation.users.create(username="two")
         member_one = group.memberships.create(user=voter_one, votes=1)
@@ -200,7 +212,7 @@ class MeetingGroupTests(TestCase):
         self.assertIsNone(member_one.votes)
 
     def test_relation_to_self(self):
-        group = self.meetings[0].groups.create(title="One")
+        group = self.meetings[0].groups.create(title="One", groupid="one")
         group.delegate_to = group
         with self.assertRaises(IntegrityError):
             group.save()
@@ -261,8 +273,8 @@ class GroupRoleTests(TestCase):
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.meeting.group_roles_active = True
         cls.meeting.save()
-        cls.group_one = cls.meeting.groups.create(title="Oners")
-        cls.group_two = cls.meeting.groups.create(title="Twoers")
+        cls.group_one = cls.meeting.groups.create(title="Oners", groupid="oners")
+        cls.group_two = cls.meeting.groups.create(title="Twoers", groupid="twoers")
         cls.participant = User.objects.get(username="participant")
         cls.councilor = GroupRole.objects.create(
             meeting=cls.meeting,

@@ -523,7 +523,7 @@ class MeetingInviteViewSetCreateTests(APITestCase):
         cls.participant: User = cls.meeting.participants.get(username="participant")
         cls.moderator: User = cls.meeting.participants.get(username="moderator")
         cls.group = MeetingGroup.objects.create(
-            meeting=cls.meeting, groupid="committee"
+            meeting=cls.meeting, groupid="committee", title="committee"
         )
         cls.role_main = cls.meeting.group_roles.create(role_id="main")
         cls.role_subst = cls.meeting.group_roles.create(role_id="subst")
@@ -675,7 +675,9 @@ class MeetingInviteViewSetCreateTests(APITestCase):
 
     def test_create_two_groups_with_different_roleid(self):
         """Different groups are different records -- no conflict."""
-        other = MeetingGroup.objects.create(meeting=self.meeting, groupid="board")
+        other = MeetingGroup.objects.create(
+            meeting=self.meeting, groupid="board", title="board"
+        )
         response = self._post(
             {
                 "meeting": self.meeting.pk,
@@ -1049,7 +1051,9 @@ class MeetingInviteViewSetAnnotationWsTests(APITestCase):
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.moderator: User = cls.meeting.participants.get(username="moderator")
-        cls.group = MeetingGroup.objects.create(meeting=cls.meeting, groupid="board")
+        cls.group = MeetingGroup.objects.create(
+            meeting=cls.meeting, groupid="board", title="board"
+        )
         cls.invite = cls.meeting.invites.create(
             user_data={"email": "a@example.com"}, roles=["pa"]
         )
@@ -1101,7 +1105,9 @@ class MeetingInviteViewSetClearAnnotationsTests(APITestCase):
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.moderator: User = cls.meeting.participants.get(username="moderator")
-        cls.group = MeetingGroup.objects.create(meeting=cls.meeting, groupid="board")
+        cls.group = MeetingGroup.objects.create(
+            meeting=cls.meeting, groupid="board", title="board"
+        )
         cls.invite = cls.meeting.invites.create(
             user_data={"email": "a@example.com"}, roles=["pa"]
         )

@@ -33,12 +33,14 @@ class MainSubstActivePolicyTests(TestCase):
         )
         # Groups
         cls.the_voters_group: MeetingGroup = cls.meeting.groups.create(
-            groupid="the_voters", votes=2
+            groupid="the_voters", votes=2, title="the_voters"
         )
         cls.the_other_voters_group: MeetingGroup = cls.meeting.groups.create(
-            groupid="the_other_voters", votes=2
+            groupid="the_other_voters", votes=2, title="the_other_voters"
         )
-        cls.the_board: MeetingGroup = cls.meeting.groups.create(groupid="board")
+        cls.the_board: MeetingGroup = cls.meeting.groups.create(
+            groupid="board", title="board"
+        )
         # Users
         cls.president = User.objects.create(username="president")
         cls.main1 = User.objects.create(username="one")
@@ -91,7 +93,9 @@ class MainSubstActivePolicyTests(TestCase):
 
     def test_n1(self):
         for i in range(5):
-            group = self.meeting.groups.create(groupid=f"group_{i}", votes=3)
+            group = self.meeting.groups.create(
+                groupid=f"group_{i}", title=f"Group {i}", votes=3
+            )
             user = self.meeting.participants.create(username=f"user_{i}")
             group.memberships.create(user=user, role=self.main_role)
         with self.assertNumQueries(5):

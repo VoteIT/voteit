@@ -477,7 +477,7 @@ class RemovalReportTests(TestCase):
         ai.discussions.create(author=self.participant)
         ai.discussions.create(author=self.participant)
         ai.discussions.create()
-        group = self.meeting.groups.create(title="Board")
+        group = self.meeting.groups.create(title="Board", groupid="board")
         group.memberships.create(user=self.participant)
         er = ElectoralRegister.objects.create(meeting=self.meeting)
         er.set_voters_from_dict({self.participant.pk: 1})

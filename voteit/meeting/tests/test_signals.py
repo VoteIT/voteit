@@ -87,7 +87,9 @@ class ParticipantsAppStateTests(TestCase):
         cls.meeting: Meeting = Meeting.objects.create()
         cls.user: User = cls.meeting.participants.create(username="user")
         cls.meeting.add_roles(cls.user, ROLE_MODERATOR)
-        cls.group: MeetingGroup = cls.meeting.groups.create(title="Gang")
+        cls.group: MeetingGroup = cls.meeting.groups.create(
+            title="Gang", groupid="gang"
+        )
         cls.group_role: GroupRole = cls.meeting.group_roles.create(
             title="President", role_id="president"
         )
@@ -145,7 +147,7 @@ class MeetingGroupChangedTests(TestCase):
         from voteit.meeting.messages import MeetingGroupChanged
 
         with self.captureOnCommitCallbacks(execute=True):
-            group = self.meeting.groups.create()
+            group = self.meeting.groups.create(title="Added", groupid="added")
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, MeetingGroupChanged)

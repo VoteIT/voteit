@@ -251,7 +251,7 @@ class AuditLogTests(TestCase):
         meeting = Meeting.objects.create(organisation=org)
         ai = meeting.agenda_items.create()
         prop = ai.proposals.create(body="Stuff")
-        group = meeting.groups.create(title="Group")
+        group = meeting.groups.create(title="Group", groupid="group")
         membership = group.memberships.create(user=self.moderator)
         self.moderator.first_name = "Changed"
         self.moderator.save()

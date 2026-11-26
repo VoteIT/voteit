@@ -4,11 +4,11 @@ from io import StringIO
 import yaml
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
-from django.db import IntegrityError
 from django.test import override_settings
 from django.test import TestCase
 
 from voteit.discussion.models import DiscussionPost
+from voteit.export_import.exceptions import ImportFileError
 from voteit.export_import.exceptions import SignatureVerificationFailed
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
@@ -191,9 +191,19 @@ class ImporterTests(TestCase):
         self.meeting.groups.create(groupid="the-hellos", title="I'm a group")
         importer = self._cut(self.meeting, use_existing_groups=False)
         fn = os.path.join(FIXTURES_DIR, "combined_meeting_fixture.yaml")
-        importer.from_file(fn)
-        with self.assertRaises(IntegrityError):
-            importer.run()
+        with self.assertRaises(ImportFileError) as cm:
+            importer.from_file(fn)
+        self.assertIn("Groupid(s) already exist: 'the-hellos'", str(cm.exception))
+
+    def test_import_title_used_by_other_group(self):
+        self.meeting.groups.create(groupid="other", title="THE HELLOS")
+        importer = self._cut(self.meeting, use_existing_groups=True)
+        fn = os.path.join(FIXTURES_DIR, "combined_meeting_fixture.yaml")
+        with self.assertRaises(ImportFileError) as cm:
+            importer.from_file(fn)
+        self.assertIn(
+            "Title(s) already used by other groups: 'The Hellos'", str(cm.exception)
+        )
 
     def test_import_use_already_existing_groups(self):
         meeting_group = self.meeting.groups.create(

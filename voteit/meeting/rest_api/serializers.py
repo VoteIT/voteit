@@ -15,7 +15,6 @@ from voteit.core.rest_api.fields import RolesField
 from voteit.core.rest_api.fields import SameOrgUserField
 from voteit.core.rest_api.serializers import BaseModelSerializer
 from voteit.core.rest_api.serializers import UserListSerializer
-from voteit.core.rest_api.utils import meeting_from_unsafe_data
 from voteit.core.rest_api.utils import validate_model_add
 from voteit.meeting.dialects import dialect_registry
 from voteit.meeting.models import GroupMembership
@@ -32,6 +31,9 @@ from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.meeting.roles import ROLE_PROPOSER
+from voteit.meeting.utils import existing_group_identity
+from voteit.meeting.utils import is_valid_groupid
+from voteit.meeting.utils import suggest_groupid
 from voteit.poll.utils import get_electoral_policy_registry
 from voteit.room.rest_api.serializers import CreateRoomSerializer
 from voteit.speaker.rest_api.serializers import CreateSpeakerListSystemSerializer
@@ -307,9 +309,8 @@ class MeetingChangeRolesSerializer(serializers.Serializer):
 
 class CreateMeetingGroupSerializer(BaseModelSerializer):
     pk = serializers.IntegerField(read_only=True)
-    # I have no clue why the normal automation for serializer fields stopped working for this field
-    # as of DRF 3.15+
-    groupid = serializers.CharField(max_length=100, default="")
+    # Optional, generated from title when missing
+    groupid = serializers.CharField(max_length=100, required=False, allow_blank=True)
 
     class Meta:
         model = MeetingGroup
@@ -324,26 +325,40 @@ class CreateMeetingGroupSerializer(BaseModelSerializer):
             "show_on_speaker",
             "post_as",
         ]
+        # Uniqueness is checked in validate(), DRF's generated validators would make groupid required
+        validators = []
 
     def validate_meeting(self, value):
         validate_model_add(self, MeetingGroup, value)
         return value
 
-    def validate_groupid(self, value: str | None):
-        if value:
-            slug = slugify(value)
-            if value != slug:
-                raise ValidationError("Must be lowercase URL-friendly")
-            exclude_pks = []
-            if self.instance is not None:
-                meeting = self.instance.meeting
-                exclude_pks.append(self.instance.pk)
-            else:
-                meeting = meeting_from_unsafe_data(self)
-            if meeting.groups.exclude(pk__in=exclude_pks).filter(groupid=slug).exists():
-                raise ValidationError(f"GroupID {slug} already exists")
-            return slug
-        return value
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        if self.instance is None:
+            meeting = attrs["meeting"]
+            others = meeting.groups.all()
+        else:
+            meeting = self.instance.meeting
+            others = meeting.groups.exclude(pk=self.instance.pk)
+        title = attrs.get("title")
+        if title is not None and others.filter(title__iexact=title).exists():
+            raise ValidationError({"title": "A group with that title already exists."})
+        groupid = attrs.get("groupid")
+        if groupid:
+            # Legacy groupids that aren't slugs stay editable as long as they're unchanged
+            if self.instance is None or groupid != self.instance.groupid:
+                if not is_valid_groupid(groupid):
+                    raise ValidationError({"groupid": "Must be lowercase URL-friendly"})
+                if others.filter(groupid=groupid).exists():
+                    raise ValidationError(
+                        {"groupid": f"GroupID {groupid} already exists"}
+                    )
+        elif self.instance is None:
+            taken = set(others.values_list("groupid", flat=True))
+            attrs["groupid"] = suggest_groupid(title, taken)
+        else:
+            attrs.pop("groupid", None)
+        return attrs
 
 
 class MeetingGroupSerializer(CreateMeetingGroupSerializer):
@@ -453,7 +468,9 @@ class GroupMembershipSerializer(serializers.ModelSerializer):
 
 class BulkMeetingGroupItemSerializer(serializers.Serializer):
     title = serializers.CharField(max_length=100)
-    groupid = serializers.CharField(max_length=100)
+    groupid = serializers.CharField(
+        max_length=100, required=False, allow_blank=True, default=""
+    )
     votes = serializers.IntegerField(allow_null=True, required=False, default=None)
     show_on_speaker = serializers.BooleanField(default=True)
     post_as = serializers.BooleanField(default=False)
@@ -498,10 +515,10 @@ class BulkCreateMeetingGroupsSerializer(serializers.Serializer):
         dup_id_rows = []
         for i, item in enumerate(value, 1):
             title_lower = item["title"].lower()
-            groupid = item["groupid"]
-            if groupid in found_ids:
-                dup_id_rows.append(i)
-            found_ids.add(groupid)
+            if groupid := item["groupid"]:
+                if groupid in found_ids:
+                    dup_id_rows.append(i)
+                found_ids.add(groupid)
             if title_lower in found_titles:
                 dup_title_rows.append(i)
             found_titles.add(title_lower)
@@ -517,6 +534,25 @@ class BulkCreateMeetingGroupsSerializer(serializers.Serializer):
         if errors:
             raise ValidationError(errors)
         return value
+
+    def validate(self, data):
+        meeting = data["meeting"]
+        taken, title_map = existing_group_identity(meeting)
+        taken.update(item["groupid"] for item in data["groups"] if item["groupid"])
+        clash_rows = []
+        for i, item in enumerate(data["groups"], 1):
+            existing = title_map.get(item["title"].lower())
+            if existing is not None and existing != item["groupid"]:
+                clash_rows.append(i)
+            elif not item["groupid"]:
+                item["groupid"] = suggest_groupid(item["title"], taken)
+        if clash_rows:
+            raise ValidationError(
+                {
+                    "groups": f"Titles already used by other groups at rows: {', '.join(map(str, clash_rows))}"
+                }
+            )
+        return data
 
 
 class BulkDeleteMeetingGroupsSerializer(serializers.Serializer):

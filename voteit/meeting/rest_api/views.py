@@ -32,6 +32,7 @@ from voteit.core.rest_api.mixins import StateMachineMixin
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.meeting import PERM_CHANGE_DIALECT
 from voteit.meeting.dialects import dialect_registry
+from voteit.meeting.exceptions import DialectError
 from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
@@ -118,11 +119,14 @@ class MeetingViewSet(
             )
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        with transaction.atomic(durable=True):
-            handler = dialect_registry.get_merged_handler(
-                serializer.validated_data["dialect"]
-            )
-            handler.install(meeting)
+        try:
+            with transaction.atomic(durable=True):
+                handler = dialect_registry.get_merged_handler(
+                    serializer.validated_data["dialect"]
+                )
+                handler.install(meeting)
+        except DialectError as exc:
+            raise ValidationError({"dialect": [str(exc)]})
         notify_dialect_changed(meeting)
         return Response(status=200)
 

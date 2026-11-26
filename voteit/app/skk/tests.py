@@ -26,7 +26,7 @@ class SKKFumERPTests(TestCase):
         cls.role_delegat = cls.meeting.group_roles.get(role_id=DELEGAT)
         cls.role_suppleant = cls.meeting.group_roles.get(role_id=SUPPLEANT)
         cls.dobbermans: MeetingGroup = cls.meeting.groups.create(
-            title="Dobbermans", votes=6
+            title="Dobbermans", votes=6, groupid="dobbermans"
         )
         cls.user_a = cls.meeting.participants.create(username="a")
         cls.user_b = cls.meeting.participants.create(username="b")

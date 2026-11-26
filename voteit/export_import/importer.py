@@ -8,6 +8,8 @@ from voteit.agenda.models import AgendaItem
 from voteit.core.decorators import ensure_atomic
 from voteit.discussion.models import DiscussionPost
 from voteit.export_import.exceptions import ImportFileError
+from voteit.meeting.utils import existing_group_identity
+from voteit.meeting.utils import find_group_title_clashes
 from voteit.export_import.schemas import ImportMeetingStructure
 from voteit.export_import.utils import _NoAliasLoader
 from voteit.export_import.utils import verify_stream
@@ -99,6 +101,26 @@ class Importer:
             raise Exception("Already prepped")
         with schemas.schema_context(**self.export_schema_kwargs):
             self.data = self.schema(**data)
+        self.check_group_conflicts()
+
+    def check_group_conflicts(self):
+        """Groups are matched by groupid only, a clashing title is an error."""
+        taken, title_map = existing_group_identity(self.meeting)
+        errors = []
+        if not self.use_existing_groups:
+            if existing := sorted(
+                taken.intersection(g.groupid for g in self.data.groups)
+            ):
+                errors.append("Groupid(s) already exist: '%s'" % "', '".join(existing))
+        clashes = find_group_title_clashes(
+            title_map, [(g.groupid, g.title) for g in self.data.groups]
+        )
+        if clashes:
+            errors.append(
+                "Title(s) already used by other groups: '%s'" % "', '".join(clashes)
+            )
+        if errors:
+            raise ImportFileError("\n".join(errors))
 
     @ensure_atomic
     def collect_users(self):

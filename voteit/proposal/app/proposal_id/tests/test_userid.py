@@ -41,7 +41,9 @@ class ProposalTests(TestCase):
         )
 
     def test_meeting_group_id(self):
-        group = self.meeting.groups.create(title="King's College")
+        group = self.meeting.groups.create(
+            title="King's College", groupid="kings-college"
+        )
         prop = self.ai.proposals.create(
             author=self.user, meeting_group=group, as_group=True
         )

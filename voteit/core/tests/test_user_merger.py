@@ -307,7 +307,9 @@ class MergeConflictsTests(TestCase):
         cls.other_poll = Poll.objects.create(
             method_name="simple", meeting=cls.other_meeting
         )
-        cls.group = MeetingGroup.objects.create(meeting=cls.meeting, title="G")
+        cls.group = MeetingGroup.objects.create(
+            meeting=cls.meeting, title="G", groupid="g"
+        )
 
     def _conflicts(self):
         from voteit.core.user_merger import merge_conflicts
@@ -371,8 +373,12 @@ class GroupMembershipTests(TestCase):
         cls.role = GroupRole.objects.create(
             meeting=cls.meeting, title="Voter", roles=["pv"]
         )
-        cls.group = MeetingGroup.objects.create(meeting=cls.meeting, title="G1")
-        cls.shared = MeetingGroup.objects.create(meeting=cls.meeting, title="G2")
+        cls.group = MeetingGroup.objects.create(
+            meeting=cls.meeting, title="G1", groupid="g1"
+        )
+        cls.shared = MeetingGroup.objects.create(
+            meeting=cls.meeting, title="G2", groupid="g2"
+        )
 
     def _memberships(self, user):
         from voteit.meeting.models import GroupMembership
@@ -602,7 +608,9 @@ class AuditTrailTests(TestCase):
 
         cls.org = _mk_org()
         cls.meeting = _mk_meeting(cls.org)
-        cls.group = MeetingGroup.objects.create(meeting=cls.meeting, title="G")
+        cls.group = MeetingGroup.objects.create(
+            meeting=cls.meeting, title="G", groupid="g"
+        )
         cls.poll = Poll.objects.create(method_name="simple", meeting=cls.meeting)
 
     def setUp(self):

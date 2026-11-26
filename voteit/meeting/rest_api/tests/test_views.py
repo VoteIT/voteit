@@ -483,10 +483,10 @@ class MeetingGroupViewSetTests(APITestCase):
         cls.anon = User.objects.create(username="anon")
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.meeting_group: MeetingGroup = MeetingGroup.objects.create(
-            meeting=cls.meeting, title="one"
+            meeting=cls.meeting, title="one", groupid="one"
         )
         cls.meeting_group_two: MeetingGroup = MeetingGroup.objects.create(
-            meeting=cls.meeting, title="two"
+            meeting=cls.meeting, title="two", groupid="two"
         )
 
     def test_create(self):
@@ -661,7 +661,9 @@ class MeetingGroupViewSetTests(APITestCase):
         )
 
     def test_delegate_from_group_with_delegation(self):
-        self.meeting.groups.create(title="new", delegate_to=self.meeting_group)
+        self.meeting.groups.create(
+            title="new", delegate_to=self.meeting_group, groupid="new"
+        )
         self.client.force_login(self.moderator)
         url = reverse("meeting-groups-detail", kwargs={"pk": self.meeting_group.pk})
         response = self.client.patch(
@@ -816,6 +818,37 @@ class BulkCreateMeetingGroupsTests(APITestCase):
         )
         self.assertEqual(400, response.status_code)
         self.assertIn("Duplicate titles", str(response.json()))
+
+    def test_bulk_create_without_groupid(self):
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            self._url(),
+            {"meeting": self.meeting.pk, "groups": "B\nC\tc-1\nC 1"},
+            format="json",
+        )
+        self.assertEqual(200, response.status_code)
+        self.assertEqual({"created": 3, "updated": 0}, response.json())
+        self.assertEqual(
+            [("a", "A"), ("b", "B"), ("c-1", "C"), ("c-1-1", "C 1")],
+            list(self.meeting.groups.order_by("pk").values_list("groupid", "title")),
+        )
+
+    def test_bulk_create_title_used_by_existing_group(self):
+        self.client.force_login(self.moderator)
+        for clashing_row in ({"title": "a", "groupid": "other"}, {"title": "A "}):
+            response = self.client.post(
+                self._url(),
+                {
+                    "meeting": self.meeting.pk,
+                    "groups": [{"title": "B", "groupid": "b"}, clashing_row],
+                },
+                format="json",
+            )
+            self.assertEqual(400, response.status_code)
+            self.assertIn(
+                "Titles already used by other groups at rows: 2", str(response.json())
+            )
+        self.assertEqual(1, self.meeting.groups.count())
 
 
 class GroupMembershipViewSetTests(APITestCase):
@@ -1381,9 +1414,11 @@ class ExportMeetingGroupsViewSetTests(APITestCase):
         cls.meeting = Meeting.objects.get(pk=1)
         cls.moderator = User.objects.get(username="moderator")
         cls.participant = User.objects.get(username="participant")
-        cls.turkish = cls.meeting.groups.create(title="Özgür", votes=5)
+        cls.turkish = cls.meeting.groups.create(title="Özgür", groupid="ozgur", votes=5)
         cls.chineese = cls.meeting.groups.create(title="好", groupid="ni-hao", votes=8)
-        cls.swedish = cls.meeting.groups.create(title="Fika nu kör vi")
+        cls.swedish = cls.meeting.groups.create(
+            title="Fika nu kör vi", groupid="fika-nu-kor-vi"
+        )
 
     def test_not_allowed(self):
         url = reverse("export-meeting-groups-json", kwargs={"pk": self.meeting.pk})
