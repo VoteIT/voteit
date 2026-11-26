@@ -21,7 +21,13 @@
   Components opt in with the new adapter flag `enable_on_start_when_required`.
 - **Several proposals per request**: `POST /api/proposals/preview/` takes and returns a list (max 20); a single
   object now gives 400. New `POST /api/proposals/bulk-create/` saves all or nothing.
-- **Bugfix** - A broken dialect component no longer stops a meeting from starting.
+- **Meeting group titles**: Titles are unique per meeting, ignoring case, and `groupid` is required. REST create
+  and bulk-create generate a missing groupid. Imports, clones and dialects
+  that add a title already used by a group with another groupid are rejected. The migration fills blank
+  groupids and titles, and renames duplicate titles by appending the groupid.
+- **One component per name**: A meeting can only have one component of each name, now enforced by the database.
+- **Validation errors on the right field**: A malformed `agenda_item` or `meeting` is reported under that field,
+  instead of under `meeting_group` or `component_name`.
 
 ## 1.7.0 (2026-11-17)
 
