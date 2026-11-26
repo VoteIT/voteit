@@ -2826,7 +2826,7 @@ wheels = [
 
 [[package]]
 name = "voteit"
-version = "1.8.0rc3"
+version = "1.8.0"
 source = { editable = "." }
 dependencies = [
     { name = "bs4" },

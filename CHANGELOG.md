@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.8.0 (unreleased)
+## 1.8.0 (2026-11-26)
 
 - **Duplicate accounts at login**: An id proxy login that reaches several accounts now pauses and lets the person pick
   one or merge them (`/api/identity-account-options/`, new setting `CHOOSE_ACCOUNT_URL`). Unused duplicates are merged
