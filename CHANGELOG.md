@@ -22,7 +22,8 @@
 - **Several proposals per request**: `POST /api/proposals/preview/` takes and returns a list (max 20); a single
   object now gives 400. New `POST /api/proposals/bulk-create/` saves all or nothing.
 - **Meeting group titles**: Titles are unique per meeting, ignoring case, and `groupid` is required. REST create
-  and bulk-create generate a missing groupid. Imports, clones and dialects
+  and bulk-create generate a missing groupid. A bulk-create row without groupid updates the group with that
+  title, if there is one. Imports, clones and dialects
   that add a title already used by a group with another groupid are rejected. The migration fills blank
   groupids and titles, and renames duplicate titles by appending the groupid.
 - **One component per name**: A meeting can only have one component of each name, now enforced by the database.

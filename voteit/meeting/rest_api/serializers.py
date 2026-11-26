@@ -539,19 +539,33 @@ class BulkCreateMeetingGroupsSerializer(serializers.Serializer):
         meeting = data["meeting"]
         taken, title_map = existing_group_identity(meeting)
         taken.update(item["groupid"] for item in data["groups"] if item["groupid"])
+        explicit_ids = {item["groupid"] for item in data["groups"] if item["groupid"]}
         clash_rows = []
+        dup_id_rows = []
         for i, item in enumerate(data["groups"], 1):
             existing = title_map.get(item["title"].lower())
-            if existing is not None and existing != item["groupid"]:
+            if not item["groupid"]:
+                if existing is None:
+                    item["groupid"] = suggest_groupid(item["title"], taken)
+                elif existing in explicit_ids:
+                    # Another row targets that group by groupid
+                    dup_id_rows.append(i)
+                else:
+                    # Titles are unique, so this updates the group that has it
+                    item["groupid"] = existing
+            elif existing is not None and existing != item["groupid"]:
                 clash_rows.append(i)
-            elif not item["groupid"]:
-                item["groupid"] = suggest_groupid(item["title"], taken)
+        errors = []
         if clash_rows:
-            raise ValidationError(
-                {
-                    "groups": f"Titles already used by other groups at rows: {', '.join(map(str, clash_rows))}"
-                }
+            errors.append(
+                f"Titles already used by other groups at rows: {', '.join(map(str, clash_rows))}"
             )
+        if dup_id_rows:
+            errors.append(
+                f"Rows match a group another row sets by groupid: {', '.join(map(str, dup_id_rows))}"
+            )
+        if errors:
+            raise ValidationError({"groups": errors})
         return data
 
 

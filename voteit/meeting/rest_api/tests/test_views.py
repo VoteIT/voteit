@@ -835,20 +835,56 @@ class BulkCreateMeetingGroupsTests(APITestCase):
 
     def test_bulk_create_title_used_by_existing_group(self):
         self.client.force_login(self.moderator)
-        for clashing_row in ({"title": "a", "groupid": "other"}, {"title": "A "}):
-            response = self.client.post(
-                self._url(),
-                {
-                    "meeting": self.meeting.pk,
-                    "groups": [{"title": "B", "groupid": "b"}, clashing_row],
-                },
-                format="json",
-            )
-            self.assertEqual(400, response.status_code)
-            self.assertIn(
-                "Titles already used by other groups at rows: 2", str(response.json())
-            )
+        response = self.client.post(
+            self._url(),
+            {
+                "meeting": self.meeting.pk,
+                "groups": [
+                    {"title": "B", "groupid": "b"},
+                    {"title": "a", "groupid": "other"},
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(400, response.status_code)
+        self.assertIn(
+            "Titles already used by other groups at rows: 2", str(response.json())
+        )
         self.assertEqual(1, self.meeting.groups.count())
+
+    def test_bulk_create_without_groupid_updates_by_title(self):
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            self._url(),
+            {"meeting": self.meeting.pk, "groups": "a \t\t3\nB\t\t2"},
+            format="json",
+        )
+        self.assertEqual(200, response.status_code)
+        self.assertEqual({"created": 1, "updated": 1}, response.json())
+        self.assertEqual(
+            [("a", "a", 3), ("b", "B", 2)],
+            list(
+                self.meeting.groups.order_by("pk").values_list(
+                    "groupid", "title", "votes"
+                )
+            ),
+        )
+
+    def test_bulk_create_title_match_and_groupid_hit_same_group(self):
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            self._url(),
+            {
+                "meeting": self.meeting.pk,
+                "groups": [{"title": "Other", "groupid": "a"}, {"title": "A"}],
+            },
+            format="json",
+        )
+        self.assertEqual(400, response.status_code)
+        self.assertIn(
+            "Rows match a group another row sets by groupid: 2", str(response.json())
+        )
+        self.assertEqual("A", self.meeting.groups.get().title)
 
 
 class GroupMembershipViewSetTests(APITestCase):
